@@ -1,0 +1,155 @@
+{
+  "projectType": "saas",
+  "projectName": "ESP Website",
+  "projectDescription": "A comprehensive web platform for managing educational programs like MIT Splash, handling registration, scheduling, and logistics",
+  "theme": "linden",
+  "primaryColor": "#8B0000",
+  "lightColor": "#C41E3A",
+  "darkColor": "#5C0000",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/programs",
+              "concepts/classes",
+              "concepts/users",
+              "concepts/registration"
+            ]
+          },
+          {
+            "group": "Administrator Guide",
+            "pages": [
+              "admin/overview",
+              "admin/creating-programs",
+              "admin/program-modules",
+              "admin/themes",
+              "admin/student-apps"
+            ]
+          },
+          {
+            "group": "User Workflows",
+            "pages": [
+              "workflows/student-registration",
+              "workflows/teacher-registration",
+              "workflows/onsite-checkin",
+              "workflows/volunteer-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "dev/setup",
+              "dev/docker",
+              "dev/contributing"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "dev/architecture",
+              "dev/directory-structure",
+              "dev/models",
+              "dev/program-modules"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "dev/cache",
+              "dev/email",
+              "dev/tags",
+              "dev/utils"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "dev/deploying",
+              "dev/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/program",
+              "api/models/class",
+              "api/models/user",
+              "api/models/registration",
+              "api/models/resources"
+            ]
+          },
+          {
+            "group": "Program Modules",
+            "pages": [
+              "api/modules/overview",
+              "api/modules/student",
+              "api/modules/teacher",
+              "api/modules/admin",
+              "api/modules/onsite"
+            ]
+          },
+          {
+            "group": "Controllers",
+            "pages": [
+              "api/controllers/autoscheduler",
+              "api/controllers/lottery"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Program creation and management",
+    "Student and teacher registration workflows",
+    "Class scheduling and lottery system",
+    "Financial aid processing",
+    "Payment integration (Stripe, CyberSource)",
+    "Resource management (classrooms, materials)",
+    "Onsite check-in and attendance tracking",
+    "Custom forms and surveys",
+    "Email and SMS communication (Twilio)",
+    "Customizable themes and branding",
+    "Multi-role permissions system",
+    "Admin dashboard and reporting"
+  ],
+  "publicApiSurface": [
+    "/manage/newprogram - Create new program",
+    "/learn/<program>/<instance>/ - Student registration portal",
+    "/teach/<program>/<instance>/ - Teacher registration portal",
+    "/manage/<program>/<instance>/ - Admin management interface",
+    "/onsite/<program>/<instance>/ - Onsite check-in interface",
+    "/volunteer/<program>/<instance>/ - Volunteer signup",
+    "/admin/ - Django admin interface",
+    "/themes/ - Theme customization",
+    "/customforms/ - Custom form builder",
+    "Program model - Core program management",
+    "ClassSubject model - Class definition",
+    "ClassSection model - Class section/timeblock",
+    "ESPUser model - Extended user model",
+    "StudentRegistration model - Student class registration",
+    "ProgramModule system - Extensible module framework"
+  ]
+}
