@@ -1,0 +1,270 @@
+---
+title: Teacher Registration
+description: Guide teachers through submitting classes and completing registration for an ESP program
+---
+
+Teacher registration enables instructors to create and manage classes, complete required training, and prepare for teaching at ESP programs. The workflow guides teachers through all necessary steps to become approved instructors.
+
+## Registration Overview
+
+The teacher registration system is similar in structure to student registration, using a modular approach with required and optional steps. Teachers access the main page at `/teach/[program]/[instance]/teacherreg` to manage their registration.
+
+## Teacher Registration Workflow
+
+<Steps>
+  <Step title="Create an Account">
+    Teachers must have an ESP account to register:
+    
+    - Create account at the registration page
+    - Verify email address (if email verification is enabled)
+    - Account is automatically marked as a teacher account
+    - Can reuse account for future programs
+  </Step>
+
+  <Step title="Complete Teacher Profile">
+    Fill out the teacher profile form with:
+    
+    - Personal information (name, email, phone)
+    - Affiliation (e.g., MIT student, community member, etc.)
+    - Graduation year (if applicable)
+    - T-shirt size and style preferences
+    - Planned purchases (supplies or materials needed)
+    - Message for program directors
+    
+    Profile fields can be customized using tags:
+    - `teacherreg_hide_fields`: Hide specific fields
+    - `teacherreg_label_*`: Customize field labels
+    - `teacherinfo_shirt_options`: Control shirt field visibility
+  </Step>
+
+  <Step title="Submit Teacher Biography (Optional)">
+    If the Teacher Bio Module is enabled:
+    
+    - Write a brief biography describing background and interests
+    - Upload a profile picture (optional)
+    - Biography appears in the student catalog
+    - Helps students learn about their teachers
+    
+    **Note**: All biographical information is displayed publicly, so teachers should not include private information.
+  </Step>
+
+  <Step title="Create Class(es)">
+    The core of teacher registration is creating classes:
+    
+    **Basic Class Information**
+    - Class title and category
+    - Grade range (minimum and maximum grades)
+    - Class size/capacity
+    - Duration and number of sections
+    
+    **Detailed Description**
+    - Course description for students
+    - Prerequisites (if any)
+    - Difficulty level
+    - Materials students should bring
+    
+    **Resource Requests**
+    - Room type (classroom, lab, outdoors, etc.)
+    - Equipment needed (projector, whiteboard, computers)
+    - Special requirements
+    
+    **Documents and Materials**
+    - Upload handouts and class materials
+    - Create web pages for the class
+    - Attach external links
+    
+    Classes can be:
+    - Created from scratch
+    - Imported from previous programs (if `allow_class_import` tag is set)
+    - Duplicated to create multiple sections
+  </Step>
+
+  <Step title="Set Availability">
+    If the Availability Module is enabled:
+    
+    - View all program timeslots
+    - Check times when available to teach
+    - Must be available for all scheduled class times
+    
+    **Important**: 
+    - Once classes are scheduled, availability cannot be changed without admin help
+    - The scheduler enforces availability constraints
+    - Use "Force Availability" or "Manage Class" page to override if needed
+  </Step>
+
+  <Step title="Register for Teacher Training/Interview (If Required)">
+    Some programs require teachers to attend training or interviews:
+    
+    - View available time slots
+    - Select preferred training session
+    - Select interview time (if separate)
+    - Receive confirmation of selected times
+    
+    Configured through the Teacher Events Module.
+  </Step>
+
+  <Step title="Complete Teacher Quiz">
+    If the Teacher Quiz Module is enabled:
+    
+    - Answer logistics and policy questions
+    - Must answer all questions correctly to proceed
+    - Can retry until all answers are correct
+    - Ensures teachers understand program requirements
+    
+    Quiz is created using custom forms with correct answers specified.
+  </Step>
+
+  <Step title="Submit Teacher Acknowledgement">
+    If required, teachers must:
+    
+    - Acknowledge commitment to teaching
+    - Confirm they will show up for scheduled classes
+    - Agree to program policies
+    - Reduces teacher no-shows
+  </Step>
+
+  <Step title="Create Application Questions (Optional)">
+    If the Teacher Review Apps module is enabled:
+    
+    - Create custom application questions for each class
+    - Students must answer questions to apply
+    - Review student responses
+    - Select which students to admit
+    
+    Used for selective classes or programs with limited capacity.
+  </Step>
+
+  <Step title="Complete Custom Forms">
+    If configured, complete any additional forms:
+    
+    - Program-specific information
+    - Demographic surveys
+    - Special requests
+    - Background check consent (if required)
+  </Step>
+
+  <Step title="Preview and Submit">
+    Before classes are approved:
+    
+    - Preview how classes appear in the student catalog
+    - View other teachers' submitted classes (if preview module enabled)
+    - Make final edits to class descriptions
+    - Ensure all required modules are completed
+  </Step>
+</Steps>
+
+## Class Approval Process
+
+After submission, classes go through review:
+
+1. **Submitted**: Class is created but not yet reviewed
+2. **Review**: Administrators review class description and requirements
+3. **Approved**: Class appears in student catalog and can be scheduled
+4. **Rejected**: Class needs changes or doesn't meet requirements
+
+Teachers receive emails at each stage and can edit classes until approval.
+
+## Class Management
+
+Teachers can manage their classes through the registration interface:
+
+- Edit class details before approval
+- Upload additional materials
+- View enrolled students
+- Communicate with administrators
+- Check scheduling status
+
+## After Approval
+
+Once classes are approved:
+
+- Classes appear in the student catalog
+- Can be scheduled by administrators
+- Teachers can view their schedule
+- Access roster and student information
+- Take attendance during the program
+
+## Co-Teaching
+
+Teachers can add co-teachers to their classes:
+
+- Add co-teachers by username or email
+- Co-teachers have equal access to class management
+- All co-teachers must indicate availability
+- Share responsibilities for class preparation
+
+## Moderator Program
+
+If the Moderator Module is enabled:
+
+- Teachers can express interest in moderating
+- Fill out moderator application form
+- Administrators assign moderators to sections
+- Moderators assist with specific classes
+
+The term "Moderator" can be customized via the `Moderator title` tag.
+
+## Teacher Onsite Features
+
+The Teacher Onsite Webapp provides mobile access during the program:
+
+- View teaching schedule at `/teach/[program]/[instance]/teacheronsite`
+- Take attendance for classes
+- Get directions to classrooms
+- View student rosters
+- Fill out surveys
+- View student survey results
+
+## Survey Completion
+
+After the program:
+
+- Complete teacher feedback survey
+- Provide input on program improvements
+- Review student feedback for your classes
+- Contribute to program assessment
+
+## Tips for Successful Registration
+
+- **Start early**: Complete your profile and create classes well before deadlines
+- **Clear descriptions**: Write detailed, engaging class descriptions to attract students
+- **Realistic capacity**: Set class sizes based on your comfort level and material
+- **Availability**: Mark all times you're truly available, not just preferred times
+- **Materials**: Upload handouts early so students can preview them
+- **Communication**: Respond promptly to administrator questions
+- **Updates**: Check your email regularly for class status updates
+- **Preparation**: Review your roster before the program starts
+
+## Class Categories
+
+Classes are organized into categories that help students browse:
+
+- Science
+- Mathematics  
+- Computer Science
+- Engineering
+- Humanities
+- Arts
+- Special Topics
+- Walk-in Activities
+
+Categories are program-specific and configured by administrators.
+
+## Difficulty Levels
+
+Teachers indicate class difficulty to help students choose appropriately:
+
+- Can be customized via `teacherreg_difficulty_label` tag
+- Default levels vary by program
+- Appears in catalog to guide student selection
+
+## Resource Requests
+
+When creating classes, request specific resources:
+
+- **Room type**: Classroom, computer lab, outdoor space
+- **Capacity**: Minimum room size needed
+- **Equipment**: Projectors, whiteboards, science equipment
+- **Special needs**: Sinks, power outlets, specific software
+
+Administrators use these requests during scheduling to ensure appropriate room assignments.

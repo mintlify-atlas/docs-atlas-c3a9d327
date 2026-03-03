@@ -1,0 +1,261 @@
+---
+title: Program Modules Overview
+description: Understanding the ESP Website program module system architecture and how modules work
+---
+
+## Introduction
+
+The ESP Website uses a powerful **program module system** to provide flexible functionality for managing educational programs like MIT Splash. Program modules are Python classes that inherit from `ProgramModuleObj` and can be dynamically enabled or disabled for each program.
+
+## Architecture
+
+### Base Classes
+
+All program modules are built on a common foundation defined in `esp/esp/program/modules/base.py`:
+
+#### ProgramModuleObj
+
+The base class for all program modules. Key features:
+
+- **Database Model**: Extends Django's `models.Model` to store module configuration
+- **URL Routing**: Automatically routes URLs based on module type and view functions
+- **View Discovery**: Uses decorators (`@main_call`, `@aux_call`) to identify view functions
+- **Permission Checking**: Built-in decorators for authentication and deadline enforcement
+- **Module Lifecycle**: Methods for checking completion status and requirements
+
+Key fields:
+- `program`: Foreign key to the Program
+- `module`: Foreign key to ProgramModule (module definition)
+- `seq`: Sequence number for ordering
+- `required`: Whether the module is required
+- `link_title`: Custom link title override
+
+#### CoreModule
+
+A marker class for core registration modules that serve as the main entry point for a user type:
+
+```python
+class CoreModule(object):
+    """All core modules should derive from this."""
+    pass
+```
+
+Core modules include:
+- `StudentRegCore` - Main student registration page
+- `TeacherRegCore` - Main teacher registration page
+- `AdminCore` - Program dashboard for administrators
+- `OnsiteCore` - Onsite registration landing page
+
+### Module Types
+
+Modules are categorized by `module_type`, which determines where they appear:
+
+| Module Type | User Role | URL Pattern | Purpose |
+|-------------|-----------|-------------|----------|
+| `learn` | Students | `/learn/<program>/...` | Student registration and participation |
+| `teach` | Teachers | `/teach/<program>/...` | Teacher registration and class management |
+| `manage` | Admins | `/manage/<program>/...` | Program administration |
+| `onsite` | Onsite Staff | `/onsite/<program>/...` | Day-of-program operations |
+| `json` | Various | `/json/<program>/...` | API endpoints |
+| `volunteer` | Volunteers | `/volunteer/<program>/...` | Volunteer management |
+
+### View Decorators
+
+Modules use decorators to define views and enforce permissions:
+
+#### Call Type Decorators
+
+- `@main_call`: Marks the primary view for a module (only one per module)
+- `@aux_call`: Marks auxiliary/secondary views
+
+#### Permission Decorators
+
+- `@needs_student`: Requires student role
+- `@needs_teacher`: Requires teacher role
+- `@needs_admin`: Requires admin role
+- `@needs_onsite`: Requires onsite staff role
+- `@needs_student_in_grade`: Requires student in correct grade range
+- `@usercheck_usetl`: Checks role based on module type (tl parameter)
+
+#### Deadline Decorators
+
+- `@meets_deadline(extension)`: Checks if a specific deadline has been met
+- `@meets_any_deadline(extensions)`: Checks if any of multiple deadlines are met
+- `@meets_cap`: Checks if program capacity allows new registrations
+
+### Module Properties
+
+Each module defines its properties via the `module_properties()` class method:
+
+```python
+@classmethod
+def module_properties(cls):
+    return {
+        "link_title": "Display Name",
+        "admin_title": "Admin Display Name",
+        "module_type": "learn",  # or teach, manage, onsite
+        "seq": 10,  # ordering sequence
+        "required": False,  # is this a required step?
+        "choosable": 1,  # can admins enable/disable this?
+    }
+```
+
+## Module Lifecycle
+
+### Initialization
+
+Modules are initialized for each program through:
+
+1. **Program Creation**: When a new program is created, modules can be automatically added
+2. **Manual Addition**: Admins can enable modules through the admin interface
+3. **Module Extensions**: Some modules auto-create settings models (e.g., `StudentClassRegModuleInfo`)
+
+### View Resolution
+
+When a user accesses a URL like `/learn/Splash/2024/studentreg`:
+
+1. The URL pattern identifies the module type (`learn`), program (`Splash/2024`), and view name (`studentreg`)
+2. `ProgramModuleObj.findModuleObject()` locates the appropriate module
+3. The system checks if the view is a main call or aux call
+4. For core modules, required modules are enforced before showing the main view
+5. The view function is called with parameters: `(request, tl, one, two, call_txt, extra, prog)`
+
+### Completion Tracking
+
+Modules can implement `isCompleted()` to track whether a user has finished a required step:
+
+```python
+def isCompleted(self):
+    return Record.objects.filter(
+        user=self.user,
+        program=self.program,
+        event__name="studentacknowledgement"
+    ).exists()
+```
+
+## User Tracking
+
+Modules can define methods to track different user populations:
+
+### For Student Modules
+
+```python
+def students(self, QObject=False):
+    """Return dict of student categories."""
+    q_confirmed = Q(record__event__name="reg_confirmed", record__program=self.program)
+    if QObject:
+        return {'confirmed': q_confirmed}
+    return {'confirmed': ESPUser.objects.filter(q_confirmed).distinct()}
+
+def studentDesc(self):
+    """Return descriptions of student categories."""
+    return {'confirmed': "Students who have confirmed registration"}
+```
+
+### For Teacher Modules
+
+```python
+def teachers(self, QObject=False):
+    """Return dict of teacher categories."""
+    
+def teacherDesc(self):
+    """Return descriptions of teacher categories."""
+```
+
+### For Volunteer Modules
+
+```python
+def volunteers(self, QObject=False):
+    """Return dict of volunteer categories."""
+
+def volunteerDesc(self):
+    """Return descriptions of volunteer categories."""
+```
+
+## Module Extensions
+
+Some modules use database models to store settings, defined in `esp/esp/program/modules/module_ext.py`:
+
+### StudentClassRegModuleInfo
+
+Controls student class registration behavior:
+- Capacity enforcement
+- Class cap multipliers
+- Priority registration
+- Button customization
+- Visibility settings
+
+### ClassRegModuleInfo
+
+Controls teacher class registration:
+- Co-teaching settings
+- Class duration limits
+- Class size options
+- Resource request settings
+
+## Template System
+
+Modules can use templates located in:
+
+```
+esp/templates/program/modules/<modulename>/
+```
+
+The `baseDir()` method returns the base template directory for a module:
+
+```python
+def baseDir(self):
+    return 'program/modules/' + self.__class__.__name__.lower() + '/'
+```
+
+## Common Patterns
+
+### Creating a Simple Module
+
+```python
+from esp.program.modules.base import ProgramModuleObj, needs_student, main_call
+from esp.utils.web import render_to_response
+
+class MyModule(ProgramModuleObj):
+    doc = """Description of what this module does."""
+    
+    @classmethod
+    def module_properties(cls):
+        return {
+            "link_title": "My Module",
+            "module_type": "learn",
+            "seq": 50,
+            "choosable": 1,
+        }
+    
+    @main_call
+    @needs_student
+    def myview(self, request, tl, one, two, module, extra, prog):
+        context = {'program': prog}
+        return render_to_response(self.baseDir() + 'main.html', request, context)
+```
+
+### Adding Completion Logic
+
+```python
+def isCompleted(self):
+    user = get_current_request().user
+    # Check if user has completed the required action
+    return SomeModel.objects.filter(user=user, program=self.program).exists()
+```
+
+### Adding Required Validation
+
+```python
+def prepare(self, context):
+    """Called when rendering the core registration page."""
+    context['my_data'] = self.get_data()
+    return context
+```
+
+## Next Steps
+
+- [Student Modules](/api/modules/student) - Modules for student registration
+- [Teacher Modules](/api/modules/teacher) - Modules for teacher registration
+- [Admin Modules](/api/modules/admin) - Modules for program administration
+- [Onsite Modules](/api/modules/onsite) - Modules for day-of-program operations

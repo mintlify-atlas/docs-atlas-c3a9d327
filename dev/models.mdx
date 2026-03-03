@@ -1,0 +1,586 @@
+---
+title: Data models reference
+description: Guide to commonly used models in ESP Website
+---
+
+This page provides a quick reference to the most commonly used models in the ESP Website codebase.
+
+<Note>
+  For complete model documentation with all fields and methods, see the [API Reference](/api/models/program) section.
+</Note>
+
+## Core Models Overview
+
+ESP Website uses Django's ORM with several key patterns. Here's a visual overview:
+
+```
+Program (Splash Fall 2024)
+    ├── has many → ClassSubject (classes offered)
+    │   └── has many → ClassSection (scheduled instances)
+    │       ├── scheduled in → Event (time block)
+    │       ├── assigned to → Resource (classroom)
+    │       └── enrolled → StudentRegistration
+    ├── configured by → Tag (settings)
+    ├── has many → ESPUser (participants)
+    └── uses → ProgramModuleObj (enabled features)
+```
+
+## User Models
+
+### ESPUser
+
+**Location**: `esp/esp/users/models/__init__.py`
+
+**Purpose**: Extended user model for students, teachers, and administrators.
+
+**Key Features**:
+- Proxy model over Django's `User` (adds methods, not fields)
+- Type checking: `isStudent()`, `isTeacher()`, `isAdministrator()`
+- Grade management: `getGrade()`, `getYOG()`, `set_grade()`
+- Class queries: `getEnrolledClasses()`, `getTaughtClasses()`
+
+```python
+from esp.users.models import ESPUser
+
+# Get a user
+user = ESPUser.objects.get(username='student123')
+
+# Check user type
+if user.isStudent():
+    grade = user.getGrade(program)
+    classes = user.getEnrolledClasses(program)
+
+# Get all students in a program
+students = ESPUser.objects.filter(
+    studentregistration__section__parent_class__parent_program=program
+).distinct()
+```
+
+<Accordion title="Related Models">
+  - **StudentInfo**: Student-specific data (graduation year, school, heard_about)
+  - **TeacherInfo**: Teacher-specific data (from_here, college, major)
+  - **ContactInfo**: Phone numbers and addresses
+  - **RegistrationProfile**: Profile information for a specific program
+</Accordion>
+
+### Group
+
+**Location**: `django.contrib.auth.models.Group`
+
+**Purpose**: User type categorization (Student, Teacher, Administrator, etc.).
+
+```python
+from django.contrib.auth.models import Group
+
+# Get all teachers
+teacher_group = Group.objects.get(name='Teacher')
+teachers = teacher_group.user_set.all()
+```
+
+### Permission
+
+**Location**: `esp/esp/users/models/__init__.py`
+
+**Purpose**: Fine-grained access control for program administration.
+
+```python
+from esp.users.models import Permission
+
+# Check if user can administer a program
+if Permission.user_has_perm(user, 'V/Administer', program):
+    # User is a program administrator
+
+# Grant permission
+Permission.grant_permission(user, 'V/Administer/Edit', program)
+```
+
+**Common Permissions**:
+- `V/Administer` - Full program administration
+- `V/Administer/Edit` - Edit program settings
+- `V/Flags/UserRole/Student` - Student role
+- `V/Flags/UserRole/Teacher` - Teacher role
+
+## Program Models
+
+### Program
+
+**Location**: `esp/esp/program/models/__init__.py`
+
+**Purpose**: Represents an instance of a program (e.g., "Splash Fall 2024").
+
+**Key Fields**:
+- `url` - URL identifier (e.g., "Splash")
+- `name` - Full name (e.g., "Splash")
+- `grade_min`, `grade_max` - Grade restrictions
+- `program_size_max` - Capacity limit
+- `director_email` - Program contact
+
+**Key Methods**:
+- `students()` - Get all registered students
+- `teachers()` - Get all teachers
+- `getTimeSlots()` - Get all time blocks
+- `get_learn_url()` - Student registration URL
+- `get_teach_url()` - Teacher registration URL
+
+```python
+from esp.program.models import Program
+
+# Get a program
+program = Program.objects.get(url='Splash', name='Fall 2024')
+
+# Get all students
+students = program.students()
+
+# Get URL parts
+url = program.url  # "Splash"
+instance = program.name  # "Fall 2024"
+# Student reg URL: /learn/Splash/Fall_2024/
+```
+
+### ClassSubject
+
+**Location**: `esp/esp/program/models/class_.py`
+
+**Purpose**: Represents a class offering (e.g., "H9876: Introduction to Robotics").
+
+**Key Fields**:
+- `title` - Class title
+- `class_info` - Description
+- `category` - Subject category
+- `grade_min`, `grade_max` - Grade restrictions
+- `class_size_max` - Maximum students
+- `duration` - Length in minutes
+- `status` - Approval status (Unreviewed, Accepted, etc.)
+
+**Key Methods**:
+- `emailcode()` - Email ID (e.g., "H9876")
+- `teachers()` - Get teaching team
+- `sections` - Related ClassSection objects
+- `num_students()` - Total enrolled students
+
+```python
+from esp.program.models import ClassSubject
+
+# Create a class
+cls = ClassSubject.objects.create(
+    parent_program=program,
+    title="Introduction to Robotics",
+    class_info="Learn to build robots!",
+    grade_min=7,
+    grade_max=12,
+    class_size_max=20,
+    duration=50
+)
+
+# Add teachers
+cls.makeTeacher(teacher_user)
+
+# Get email code
+print(cls.emailcode())  # e.g., "H9876"
+```
+
+### ClassSection
+
+**Location**: `esp/esp/program/models/class_.py`
+
+**Purpose**: A scheduled instance of a class (e.g., "H9876s1" on Saturday 10-11am in Room 123).
+
+**Key Fields**:
+- `parent_class` - Related ClassSubject
+- `duration` - Override class duration (optional)
+- `max_class_capacity` - Override capacity (optional)
+- `meeting_times` - Related Event objects (time blocks)
+- `enrolled_students` - Count of enrolled students
+
+**Key Methods**:
+- `start_time()` - Start datetime
+- `end_time()` - End datetime
+- `students()` - Enrolled students
+- `num_students()` - Enrollment count
+- `isFull()` - Check if at capacity
+- `cannotAdd(student)` - Check eligibility
+
+```python
+from esp.program.models import ClassSection
+from esp.cal.models import Event
+
+# Create a section
+section = cls.add_section()
+
+# Schedule it
+timeblock = Event.objects.get(id=1)
+section.assign_start_time(timeblock.start)
+section.meeting_times.add(timeblock)
+
+# Assign a room
+classroom = Resource.objects.get(name="Room 123")
+section.assign_room(classroom)
+
+# Check if student can enroll
+error = section.cannotAdd(student_user, autocorrect=False)
+if not error:
+    # Enroll student
+    section.preregister_student(student_user)
+```
+
+## Registration Models
+
+### StudentRegistration
+
+**Location**: `esp/esp/program/models/__init__.py`
+
+**Purpose**: Tracks a student's registration for a class section.
+
+**Key Fields**:
+- `section` - ClassSection being registered for
+- `user` - ESPUser (student)
+- `relationship` - RegistrationType (Enrolled, Interested, Priority, etc.)
+- `start_date`, `end_date` - ExpirableModel fields
+
+**Registration Types**:
+- `Enrolled` - Student is enrolled
+- `Attended` - Student attended the class
+- `Interested` - Student marked interest (lottery)
+- `Priority/1`, `Priority/2`, etc. - Priority levels (two-phase lottery)
+
+```python
+from esp.program.models import StudentRegistration, RegistrationType
+
+# Enroll a student
+reg_type = RegistrationType.get_map()['Enrolled']
+reg = StudentRegistration.objects.create(
+    section=section,
+    user=student,
+    relationship=reg_type
+)
+
+# Get all enrolled students for a section
+enrolled = StudentRegistration.valid_objects().filter(
+    section=section,
+    relationship__name='Enrolled'
+)
+
+# Check attendance
+attended = StudentRegistration.valid_objects().filter(
+    section=section,
+    relationship__name='Attended'
+).exists()
+```
+
+### StudentSubjectInterest
+
+**Location**: `esp/esp/program/models/__init__.py`
+
+**Purpose**: Tracks student interest in a ClassSubject (for two-phase lottery).
+
+```python
+from esp.program.models import StudentSubjectInterest
+
+# Student marks interest
+interest = StudentSubjectInterest.objects.create(
+    subject=class_subject,
+    user=student
+)
+
+# Get interested students
+interested_students = class_subject.students_interested()
+```
+
+### RegistrationProfile
+
+**Location**: `esp/esp/program/models/__init__.py`
+
+**Purpose**: Profile information submitted for a specific program.
+
+**Key Fields**:
+- `user` - ESPUser
+- `program` - Program
+- `student_info` - JSON field with custom data
+- `contact_user`, `contact_guardian`, `contact_emergency` - ContactInfo references
+
+## Calendar Models
+
+### Event
+
+**Location**: `esp/esp/cal/models.py`
+
+**Purpose**: Represents a time block (or other timed event like teacher training).
+
+**Key Fields**:
+- `program` - Associated program
+- `event_type` - EventType (Class Time, Lunch, etc.)
+- `start`, `end` - Datetime range
+- `short_description` - Display name
+
+```python
+from esp.cal.models import Event
+
+# Create time blocks for Saturday
+import datetime
+start = datetime.datetime(2024, 11, 16, 10, 0)
+for i in range(4):  # 4 one-hour blocks
+    Event.objects.create(
+        program=program,
+        event_type=class_time_type,
+        start=start + datetime.timedelta(hours=i),
+        end=start + datetime.timedelta(hours=i+1),
+        short_description=f"Block {i+1}"
+    )
+```
+
+## Resource Models
+
+### Resource
+
+**Location**: `esp/esp/resources/models.py`
+
+**Purpose**: Represents a classroom or equipment item.
+
+**Key Fields**:
+- `name` - Resource name (e.g., "Room 123")
+- `res_type` - ResourceType (Classroom, Projector, etc.)
+- `num_students` - Capacity (for classrooms)
+- `event` - Associated time block
+- `is_unique` - Whether resource can be shared
+
+```python
+from esp.resources.models import Resource, ResourceType
+
+# Create a classroom
+classroom_type = ResourceType.objects.get(name="Classroom")
+room = Resource.objects.create(
+    name="Room 123",
+    res_type=classroom_type,
+    num_students=25,
+    event=timeblock
+)
+
+# Check if available
+if room.is_available():
+    room.assign_to_section(section)
+```
+
+### ResourceType
+
+**Purpose**: Categories of resources.
+
+**Common Types**:
+- Classroom
+- Projector
+- Whiteboard
+- Computer
+- AV Equipment
+
+### ResourceRequest
+
+**Purpose**: Tracks resources requested by a class.
+
+### ResourceAssignment
+
+**Purpose**: Tracks which resources are assigned to which sections.
+
+## Financial Models
+
+### LineItemType
+
+**Location**: `esp/esp/accounting/models.py`
+
+**Purpose**: Type of payment (e.g., "Program Fee", "Saturday Lunch").
+
+**Key Fields**:
+- `text` - Display name
+- `amount_dec` - Price
+- `program` - Associated program
+- `required` - Whether purchase is required
+
+```python
+from esp.accounting.models import LineItemType
+
+# Create a line item
+program_fee = LineItemType.objects.create(
+    program=program,
+    text="Program Fee",
+    amount_dec=Decimal('50.00'),
+    required=True
+)
+```
+
+## Configuration Models
+
+### Tag
+
+**Location**: `esp/esp/tagdict/models.py`
+
+**Purpose**: Key-value configuration, optionally scoped to a program or other object.
+
+**Key Fields**:
+- `key` - Tag name
+- `value` - Tag value (string)
+- `content_type`, `object_id` - Optional scope (GenericForeignKey)
+
+```python
+from esp.tagdict.models import Tag
+
+# Get a program tag
+student_reg_start = Tag.getProgramTag('student_reg_start', program)
+
+# Set a tag
+Tag.setTag('require_guardian_email', program, value='True')
+
+# Get a boolean tag
+require_guardian = Tag.getBooleanTag('require_guardian_email', program, default=False)
+```
+
+See the [Tags documentation](/dev/tags) for complete details.
+
+## Common Patterns
+
+### ExpirableModel Pattern
+
+Many models inherit from `ExpirableModel` to track historical data:
+
+```python
+from esp.db.models import ExpirableModel
+
+# Get currently valid records
+valid_registrations = StudentRegistration.valid_objects().filter(...)
+
+# Expire a record (mark as inactive)
+registration.expire()
+
+# Get all records (including expired)
+all_registrations = StudentRegistration.objects.filter(...)
+```
+
+**Models using ExpirableModel**:
+- `StudentRegistration`
+- `Permission`
+- `Record`
+- `StudentSubjectInterest`
+
+### Manager Methods
+
+Many models define custom manager methods:
+
+```python
+# ClassSubject catalog query
+classes = ClassSubject.objects.catalog(program)
+
+# Get valid permissions
+perms = Permission.valid_objects().filter(user=user)
+```
+
+### Related Object Queries
+
+```python
+# Get all sections of a class
+sections = class_subject.sections.all()
+
+# Get all students in a section
+students = section.students()
+
+# Get all classes taught by a teacher
+classes = teacher_user.getTaughtClasses(program)
+
+# Get all enrolled classes for a student
+classes = student_user.getEnrolledClasses(program)
+```
+
+## Model Relationships Diagram
+
+```
+Program
+  │
+  ├── has many ──> ClassSubject
+  │                    │
+  │                    ├── taught by ──> ESPUser (Teacher)
+  │                    │
+  │                    └── has many ──> ClassSection
+  │                                    │
+  │                                    ├── scheduled ──> Event
+  │                                    │
+  │                                    ├── assigned ──> Resource
+  │                                    │
+  │                                    └── enrolled ──> StudentRegistration
+  │                                                    │
+  │                                                    └──> ESPUser (Student)
+  │
+  ├── configured by ──> Tag
+  │
+  ├── uses modules ──> ProgramModuleObj
+  │
+  └── has payments ──> LineItemType
+```
+
+## Database Queries
+
+### Common Query Patterns
+
+<AccordionGroup>
+  <Accordion title="Get all students enrolled in a program">
+    ```python
+    from esp.program.models import Program, StudentRegistration
+    from esp.users.models import ESPUser
+    
+    program = Program.objects.get(url='Splash', name='Fall 2024')
+    students = ESPUser.objects.filter(
+        studentregistration__section__parent_class__parent_program=program,
+        studentregistration__relationship__name='Enrolled'
+    ).distinct()
+    ```
+  </Accordion>
+  
+  <Accordion title="Get all classes a student is enrolled in">
+    ```python
+    from esp.program.models import ClassSection
+    
+    sections = ClassSection.objects.filter(
+        studentregistration__user=student,
+        studentregistration__relationship__name='Enrolled',
+        parent_class__parent_program=program
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Get all approved classes in a program">
+    ```python
+    from esp.program.models import ClassSubject
+    from esp.program.class_status import ClassStatus
+    
+    classes = ClassSubject.objects.filter(
+        parent_program=program,
+        status=ClassStatus.ACCEPTED
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Check if a classroom is available">
+    ```python
+    from esp.resources.models import Resource
+    
+    room = Resource.objects.get(name="Room 123", event=timeblock)
+    if room.is_available():
+        # Room is not assigned
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Program Model API" icon="calendar" href="/api/models/program">
+    Complete Program model reference
+  </Card>
+  
+  <Card title="Class Models API" icon="chalkboard" href="/api/models/class">
+    ClassSubject and ClassSection details
+  </Card>
+  
+  <Card title="User Model API" icon="user" href="/api/models/user">
+    ESPUser and related models
+  </Card>
+  
+  <Card title="Registration API" icon="clipboard-check" href="/api/models/registration">
+    StudentRegistration details
+  </Card>
+</CardGroup>

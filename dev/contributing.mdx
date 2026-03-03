@@ -1,0 +1,267 @@
+---
+title: Contributing
+description: Guidelines and workflow for contributing to ESP Website
+---
+
+This guide covers the workflow for contributing code to the ESP Website project.
+
+<Note>
+  Before contributing, ensure you've set up your development environment following the [setup guide](/dev/setup).
+</Note>
+
+## One-Time Git Configuration
+
+Configure your Git identity (remove `--global` if you don't want it to apply to other repos):
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email you@something.edu
+```
+
+### Recommended Git Settings
+
+```bash
+# Only push the current branch
+git config --global push.default simple
+
+# Enable colorful output
+git config --global color.ui auto
+git config --global color.status auto
+git config --global color.branch auto
+git config --global color.diff auto
+
+# Show branch information in git log
+git config --global log.decorate true
+
+# Configure pager
+git config --global core.pager "less -R"
+git config --global pager.status true
+git config --global pager.branch true
+git config --global pager.diff true
+
+# Set your preferred editor
+git config --global core.editor vim  # or emacs, nano, etc.
+
+# Show line numbers in grep
+git config --global grep.lineNumber true
+```
+
+## Normal Development Workflow
+
+This workflow applies if you've been added as a collaborator to the repository. If not, you should fork it using the button on GitHub, add it as a remote, and replace all `git push origin` steps with `git push <remote-name>`.
+
+<Steps>
+  <Step title="Update main branch">
+    ```bash
+    git checkout main
+    git pull
+    ```
+
+    <Note>
+      For historical reasons, this project uses `main` instead of `master`.
+    </Note>
+  </Step>
+
+  <Step title="Update dependencies (if needed)">
+    <CodeGroup>
+      ```bash Docker
+      docker compose up --build
+      ```
+
+      ```bash Native
+      cd esp
+      ./update_deps.sh
+      ./manage.py update
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a new branch">
+    ```bash
+    git checkout -b new-branch-name
+    ```
+  </Step>
+
+  <Step title="Write and test your code">
+    Make your changes and test them thoroughly. See the [Testing](#testing) section below.
+  </Step>
+
+  <Step title="Commit your changes">
+    Review what you've changed:
+
+    ```bash
+    git status
+    git diff
+    ```
+
+    Commit with a descriptive message (see [commit message style](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html)):
+
+    ```bash
+    git commit -a -m "Add feature to track user metrics"
+    ```
+
+    You can make multiple commits as needed.
+  </Step>
+
+  <Step title="Push your branch">
+    When you're ready to make a pull request:
+
+    ```bash
+    git push --set-upstream origin new-branch-name
+    ```
+  </Step>
+
+  <Step title="Create a pull request">
+    Go to [github.com/learning-unlimited/ESP-Website](https://github.com/learning-unlimited/ESP-Website). If you're logged in, you should see a banner suggesting you make a pull request. Click the button, write a summary, and submit.
+  </Step>
+
+  <Step title="Address review comments">
+    When someone reviews your pull request, they will likely have comments. This is normal! To address them:
+
+    ```bash
+    git checkout new-branch-name  # only if you switched branches
+    # Make your changes
+    # Test your changes
+    git commit -a -m "Fixed foo, bar, and baz"
+    git push
+    ```
+
+    You might go through several review cycles. Once everything is resolved, the reviewer will merge your pull request.
+  </Step>
+</Steps>
+
+## Testing
+
+<Warning>
+  **All tests must pass before submitting a pull request.** If your changes break existing tests, fix them before requesting a review.
+</Warning>
+
+When adding new functionality, add corresponding tests to the appropriate application's test module or directory.
+
+### Running Tests
+
+<Tabs>
+  <Tab title="Docker (Recommended)">
+    Run all tests:
+
+    ```bash
+    docker compose exec web python esp/manage.py test
+    ```
+
+    Run tests for a specific module (e.g., `accounting`):
+
+    ```bash
+    docker compose exec web python esp/manage.py test esp.accounting.tests
+    ```
+  </Tab>
+  <Tab title="Native">
+    ```bash
+    cd esp
+    python manage.py test --settings=esp.settings
+    ```
+  </Tab>
+</Tabs>
+
+### Test Suite Reference
+
+Tests are located in application-specific files and directories:
+
+- `esp/accounting/tests.py`
+- `esp/application/tests.py`
+- `esp/cal/tests.py`
+- `esp/dbmail/tests.py`
+- `esp/formstack/tests.py`
+- `esp/miniblog/tests.py`
+- `esp/program/tests.py`
+- `esp/survey/tests.py`
+- `esp/varnish/tests.py`
+- `esp/users/controllers/tests/test_usersearch.py`
+- `esp/program/controllers/autoscheduler/tests/`
+
+Additional tests exist in: `customforms/`, `resources/`, `qsd/`, `qsdmedia/`, `tagdict/`, `themes/`, `utils/`, and `web/`.
+
+## Code Reviews
+
+Every change must be reviewed by someone else before merging to `main`. This is important because:
+
+- It helps keep code maintainable — you write code that others can understand
+- It spreads good coding practices across the team
+- It ensures two people are familiar with every piece of code
+- It helps catch bugs (though tests are better!)
+
+### Exceptions
+
+- If multiple people collaborate on a pull request, one can merge it as long as each has reviewed the other's code
+- Chapter admins with server access may push directly to their chapter's branch (but should immediately make a PR to main)
+- Folks setting up stable release branches may cherry-pick bugfix commits from main
+
+### For Reviewers
+
+After you've had a few pull requests accepted, you can begin reviewing others' code. You'll need to be added as a repository collaborator.
+
+<Info>
+  Check out [these tips for code reviews](https://engineering.khanacademy.org/posts/tips-for-code-reviews.htm) if you're new to reviewing code.
+</Info>
+
+**When merging pull requests:**
+
+- Generally prefer the **"squash"** option unless the individual changes are fairly distinct or there's a lot of history to preserve
+- Use **"merge"** if the pull request is from `main` or will be merged into multiple branches
+- If unsure, ask a more experienced contributor
+
+For more details, see [GitHub's code review docs](https://github.com/features/code-review).
+
+## Urgent Features and Fixes
+
+<Warning>
+  This workflow is MIT-specific. Other sites should adapt it using their own prod branch.
+</Warning>
+
+<Steps>
+  <Step title="Branch from merge base">
+    ```bash
+    git pull
+    git checkout $(git merge-base main mit-prod)
+    git checkout -b urgent-branch-name
+    ```
+  </Step>
+
+  <Step title="Write and test carefully">
+    Be extra careful since this goes to production without full review.
+  </Step>
+
+  <Step title="Commit and push">
+    ```bash
+    git commit -a -m "Fix critical issue"
+    git push --set-upstream origin urgent-branch-name
+    ```
+  </Step>
+
+  <Step title="Merge to production branch">
+    ```bash
+    git checkout mit-prod
+    git merge urgent-branch-name
+    git push
+    ```
+  </Step>
+
+  <Step title="Deploy and create PR">
+    Pull code as described in the [MIT ESP Wiki](https://esp.mit.edu/wiki/index.php/The_Server#Pulling_New_Code).
+
+    Then make a pull request for `urgent-branch-name` to `main` as described above.
+  </Step>
+</Steps>
+
+## Rebasing and Squashing
+
+In general, there is **no need to rebase or squash**. GitHub handles this well enough for reviewers.
+
+<Note>
+  Only rebase or squash if you know exactly what it means, why you want to do it, and when it's safe. If unsure, skip it — a simple `git merge` works fine.
+</Note>
+
+**Exception:** When merging a PR to `main` via the GitHub UI, we generally prefer the **"squash"** option (see the Code Reviews section above).
+
+## Code of Conduct
+
+We maintain a strict [code of conduct](https://github.com/learning-unlimited/ESP-Website?tab=coc-ov-file). Please review it before contributing.

@@ -1,0 +1,414 @@
+---
+title: Registration Models
+description: Models for managing student registration and enrollment in classes
+---
+
+## Overview
+
+Student registration in ESP is handled by two primary models:
+- **StudentRegistration**: Links students to specific class sections with a relationship type
+- **StudentSubjectInterest**: Indicates student interest in a class subject
+
+These models use the ExpirableModel pattern, allowing registrations to be tracked with start and end dates.
+
+**Source:** `esp/esp/program/models/__init__.py`
+
+## StudentRegistration Model
+
+Tracks a student's relationship to a specific class section (enrolled, interested, priority, etc.).
+
+**Line:** `esp/esp/program/models/__init__.py:2199`
+
+### Core Fields
+
+<ParamField path="section" type="ForeignKey" required>
+  Class section this registration is for
+  - Links to: `ClassSection`
+  - Cannot be null
+</ParamField>
+
+<ParamField path="user" type="ForeignKey" required>
+  Student being registered
+  - Links to: `ESPUser`
+  - Cannot be null
+</ParamField>
+
+<ParamField path="relationship" type="ForeignKey" required>
+  Type of registration relationship
+  - Links to: `RegistrationType`
+  - Common values: Enrolled, Interested, Priority/1, Priority/2, Applied, Attended
+  - Cannot be null
+</ParamField>
+
+### ExpirableModel Fields
+
+Inherited from ExpirableModel base class:
+
+<ParamField path="start_date" type="DateTimeField">
+  When this registration became active
+  - Default: Current timestamp on creation
+  - Null allowed (means active since beginning of time)
+</ParamField>
+
+<ParamField path="end_date" type="DateTimeField">
+  When this registration ended/was removed
+  - Null means currently active
+  - Set to current time when registration is deleted/changed
+</ParamField>
+
+### String Representation
+
+```python
+def __str__(self):
+    return '%s %s in %s' % (self.user, self.relationship, self.section)
+# Example: "John Smith Enrolled in E1234s1"
+```
+
+## RegistrationType Model
+
+Defines the types of relationships students can have with classes.
+
+**Common Registration Types:**
+
+<ResponseField name="Enrolled" type="RegistrationType">
+  Student is officially enrolled in the class
+  - Category: student
+  - Used for: Final enrollment, class rosters
+</ResponseField>
+
+<ResponseField name="Interested" type="RegistrationType">
+  Student expressed interest but not enrolled
+  - Category: student  
+  - Used for: Initial interest, lottery systems
+</ResponseField>
+
+<ResponseField name="Priority/1, Priority/2, etc." type="RegistrationType">
+  Student's ranked preferences
+  - Category: student
+  - Used for: Lottery registration, priority systems
+</ResponseField>
+
+<ResponseField name="Applied" type="RegistrationType">
+  Student submitted application for class
+  - Category: student
+  - Used for: Classes requiring applications
+</ResponseField>
+
+<ResponseField name="Attended" type="RegistrationType">
+  Student actually attended the class
+  - Category: student
+  - Used for: Onsite check-in tracking
+</ResponseField>
+
+## StudentSubjectInterest Model
+
+Indicates a student is interested in a class subject (not a specific section).
+
+**Line:** `esp/esp/program/models/__init__.py:2214`
+
+### Fields
+
+<ParamField path="subject" type="ForeignKey" required>
+  Class subject student is interested in
+  - Links to: `ClassSubject`
+  - Cannot be null
+</ParamField>
+
+<ParamField path="user" type="ForeignKey" required>
+  Student expressing interest
+  - Links to: `ESPUser`
+  - Cannot be null
+</ParamField>
+
+<ParamField path="start_date" type="DateTimeField">
+  When interest was recorded
+  - From ExpirableModel
+</ParamField>
+
+<ParamField path="end_date" type="DateTimeField">
+  When interest ended
+  - From ExpirableModel
+  - Null = currently interested
+</ParamField>
+
+## Working with Registrations
+
+### Querying Active Registrations
+
+The ExpirableModel provides special querysets:
+
+<ResponseField name="StudentRegistration.valid_objects()" type="Manager">
+  Returns manager that filters to currently valid registrations
+  
+  **Example:**
+  ```python
+  from esp.program.models import StudentRegistration
+  
+  # Get all current enrollments
+  current_regs = StudentRegistration.valid_objects().filter(
+      relationship__name='Enrolled'
+  )
+  ```
+</ResponseField>
+
+<ResponseField name="StudentRegistration.is_valid_qobject()" type="Q">
+  Returns Q object for filtering valid registrations
+  
+  **Example:**
+  ```python
+  from django.db.models import Q
+  from esp.program.models import StudentRegistration
+  
+  # Combine with other filters
+  enrolled_in_program = StudentRegistration.objects.filter(
+      StudentRegistration.is_valid_qobject(),
+      section__parent_class__parent_program=program,
+      relationship__name='Enrolled'
+  )
+  ```
+</ResponseField>
+
+### Creating Registrations
+
+<ResponseField name="create()" type="StudentRegistration">
+  Creates a new registration record
+  
+  **Example:**
+  ```python
+  from esp.program.models import StudentRegistration, RegistrationType
+  from esp.users.models import ESPUser
+  from esp.program.models.class_ import ClassSection
+  
+  student = ESPUser.objects.get(username='student123')
+  section = ClassSection.objects.get(id=456)
+  reg_type = RegistrationType.objects.get(name='Enrolled')
+  
+  # Create enrollment
+  registration = StudentRegistration.objects.create(
+      section=section,
+      user=student,
+      relationship=reg_type
+  )
+  # start_date is automatically set to now
+  ```
+</ResponseField>
+
+### Ending Registrations
+
+To remove a student from a class, set the end_date rather than deleting:
+
+<ResponseField name="expire()">
+  Marks registration as ended
+  
+  **Example:**
+  ```python
+  from datetime import datetime
+  
+  # End a specific registration
+  reg = StudentRegistration.objects.get(id=123)
+  reg.end_date = datetime.now()
+  reg.save()
+  
+  # Or bulk expire
+  StudentRegistration.valid_objects().filter(
+      user=student,
+      section=section
+  ).update(end_date=datetime.now())
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Enrolling a Student
+
+```python
+from esp.program.models import StudentRegistration, RegistrationType
+from esp.users.models import ESPUser
+from esp.program.models.class_ import ClassSection
+
+# Get the student and section
+student = ESPUser.objects.get(username='jsmith')
+section = ClassSection.objects.get(id=789)
+
+# Check if student can register
+error = section.cannotAdd(student, checkFull=True)
+if error:
+    print(f"Cannot register: {error}")
+else:
+    # Get enrollment relationship type
+    enrolled_type = RegistrationType.objects.get(name='Enrolled')
+    
+    # Create the registration
+    reg = StudentRegistration.objects.create(
+        section=section,
+        user=student,
+        relationship=enrolled_type
+    )
+    print(f"Enrolled {student.name()} in {section.emailcode()}")
+```
+
+### Checking Student's Schedule
+
+```python
+from esp.program.models import StudentRegistration, Program
+from esp.users.models import ESPUser
+
+student = ESPUser.objects.get(username='jsmith')
+program = Program.objects.get(url='Splash/2024')
+
+# Get all enrolled classes
+enrolled = StudentRegistration.valid_objects().filter(
+    user=student,
+    section__parent_class__parent_program=program,
+    relationship__name='Enrolled'
+).select_related('section', 'section__parent_class')
+
+print(f"Schedule for {student.name()}:")
+for reg in enrolled:
+    section = reg.section
+    print(f"  {section.emailcode()}: {section.title()}")
+    if section.isScheduled():
+        print(f"    Time: {section.start_time().start}")
+        print(f"    Room: {', '.join(section.prettyrooms())}")
+```
+
+### Priority/Lottery Registration
+
+```python
+from esp.program.models import StudentRegistration, RegistrationType
+
+student = ESPUser.objects.get(username='jsmith')
+sections = ClassSection.objects.filter(id__in=[101, 102, 103])
+
+# Student ranks their top 3 choices
+for priority, section in enumerate(sections, start=1):
+    reg_type = RegistrationType.objects.get(name=f'Priority/{priority}')
+    StudentRegistration.objects.create(
+        section=section,
+        user=student,
+        relationship=reg_type
+    )
+    print(f"Set priority {priority}: {section.emailcode()}")
+```
+
+### Moving Student Between Sections
+
+```python
+from datetime import datetime
+
+# Remove from old section
+old_section = ClassSection.objects.get(id=123)
+StudentRegistration.valid_objects().filter(
+    user=student,
+    section=old_section,
+    relationship__name='Enrolled'
+).update(end_date=datetime.now())
+
+# Add to new section
+new_section = ClassSection.objects.get(id=456)
+enrolled_type = RegistrationType.objects.get(name='Enrolled')
+StudentRegistration.objects.create(
+    section=new_section,
+    user=student,
+    relationship=enrolled_type
+)
+```
+
+### Checking Class Attendance
+
+```python
+from esp.program.models import StudentRegistration, RegistrationType
+
+section = ClassSection.objects.get(id=789)
+
+# Get students who attended
+attended_type = RegistrationType.objects.get(name='Attended')
+attendees = StudentRegistration.valid_objects().filter(
+    section=section,
+    relationship=attended_type
+).select_related('user')
+
+print(f"Attendance for {section.emailcode()}:")
+for reg in attendees:
+    print(f"  - {reg.user.name()}")
+    
+print(f"Total: {attendees.count()} students")
+```
+
+### Getting Registration History
+
+```python
+# Include expired registrations to see history
+student = ESPUser.objects.get(username='jsmith')
+program = Program.objects.get(url='Splash/2024')
+
+# All registrations (current and past)
+all_regs = StudentRegistration.objects.filter(
+    user=student,
+    section__parent_class__parent_program=program
+).order_by('-start_date')
+
+for reg in all_regs:
+    status = "Active" if reg.end_date is None else f"Ended {reg.end_date}"
+    print(f"{reg.section.emailcode()}: {reg.relationship.name} - {status}")
+```
+
+### Bulk Registration Updates
+
+```python
+from datetime import datetime
+
+# Cancel all registrations for a cancelled section
+section = ClassSection.objects.get(id=123)
+
+# Expire all active registrations
+StudentRegistration.valid_objects().filter(
+    section=section
+).update(end_date=datetime.now())
+
+print(f"Cleared all registrations for {section.emailcode()}")
+```
+
+### Converting Interest to Enrollment
+
+```python
+# After lottery, convert priority to enrollment
+student = ESPUser.objects.get(username='jsmith')
+program = Program.objects.get(url='Splash/2024')
+
+interested_type = RegistrationType.objects.get(name='Interested')
+enrolled_type = RegistrationType.objects.get(name='Enrolled')
+
+# Find sections student was interested in
+interests = StudentRegistration.valid_objects().filter(
+    user=student,
+    section__parent_class__parent_program=program,
+    relationship=interested_type
+)
+
+for reg in interests:
+    section = reg.section
+    
+    # Check if section has space
+    if not section.isFull():
+        # End interest registration
+        reg.end_date = datetime.now()
+        reg.save()
+        
+        # Create enrollment
+        StudentRegistration.objects.create(
+            section=section,
+            user=student,
+            relationship=enrolled_type
+        )
+        print(f"Enrolled in {section.emailcode()}")
+    else:
+        print(f"Section {section.emailcode()} is full")
+```
+
+## Related Models
+
+- [ClassSection](/api/models/class) - Sections students register for
+- [User](/api/models/user) - Students being registered
+- [Program](/api/models/program) - Parent program containing classes
+- `RegistrationType` - Defines relationship types (Enrolled, Interested, etc.)

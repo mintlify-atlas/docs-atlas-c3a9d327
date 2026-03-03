@@ -1,0 +1,365 @@
+---
+title: Email System
+description: dbmail framework for sending and receiving emails in the ESP Website
+---
+
+The ESP Website uses the `dbmail` system to manage both outgoing and incoming email. This system stores email data in the database and processes it through cron jobs, providing reliability and audit trails for all communications.
+
+## Architecture Overview
+
+The email system consists of several key models located in `esp/esp/dbmail/models.py`:
+
+- **MessageRequest**: Initial email broadcast request with template and recipients
+- **TextOfEmail**: Processed email ready to send with all variables resolved
+- **EmailRequest**: Junction table linking messages to recipient users
+- **EmailList**: Incoming email routing rules
+- **PlainRedirect**: Simple email forwarding configuration
+
+## Outgoing Email Flow
+
+### 1. Create MessageRequest
+
+Emails originate from the communications panel where admins write email templates and select recipients:
+
+```python
+from esp.dbmail.models import MessageRequest
+from esp.users.models import ESPUser, PersistentQueryFilter
+
+# Create a query filter for recipients
+recipients_filter = PersistentQueryFilter.create_from_Q(
+    ESPUser,
+    Q(studentinfo__program=program)
+)
+
+# Create the message request
+msg_request = MessageRequest.objects.create(
+    subject="Welcome to {{ program.niceName }}!",
+    msgtext="""Dear {{ user.first_name }},
+    
+    Thank you for registering for {{ program.niceName }}.
+    Your classes start on {{ program.startdate }}.
+    
+    Best regards,
+    The {{ program.director_email }} Team
+    """,
+    sender="Splash Directors <directors@example.learningu.org>",
+    recipients=recipients_filter,
+    creator=request.user,
+    sendto_fn_name=MessageRequest.SEND_TO_SELF
+)
+```
+
+### 2. Process with Cron
+
+The `esp/dbmail_cron.py` script runs every 15 minutes and:
+
+1. **Processes unprocessed MessageRequests**: For each recipient, creates a `TextOfEmail` with variables substituted
+2. **Sends unsent TextOfEmail objects**: Delivers emails via SMTP and marks them as sent
+
+```python
+# In dbmail_cron.py (simplified)
+for msg_request in MessageRequest.objects.filter(processed=False):
+    msg_request.process()
+
+for email in TextOfEmail.objects.filter(sent__isnull=True):
+    email.send()
+```
+
+### 3. Send via SMTP
+
+Emails are sent using Django's email facilities, which pass messages to the configured MTA (typically Exim or SendGrid).
+
+## Email Models
+
+### MessageRequest
+
+Stores the email template and metadata:
+
+```python
+class MessageRequest(models.Model):
+    subject = models.TextField(null=True, blank=True)
+    msgtext = models.TextField(blank=True, null=True)
+    special_headers = models.TextField(blank=True, null=True)  # JSON
+    recipients = models.ForeignKey(PersistentQueryFilter)
+    sendto_fn_name = models.CharField(max_length=128)  # Who receives it
+    sender = models.TextField(blank=True, null=True)
+    creator = AjaxForeignKey(ESPUser)
+    created_at = models.DateTimeField(default=datetime.now)
+    processed = models.BooleanField(default=False)
+    processed_by = models.DateTimeField(null=True)
+    public = models.BooleanField(default=False)
+```
+
+#### Send-To Functions
+
+Control who receives the email for each recipient user:
+
+```python
+# Send to the user only (default)
+MESSAGE_REQUEST.SEND_TO_SELF  # ''
+
+# Send to user's guardian
+MESSAGE_REQUEST.SEND_TO_GUARDIAN
+
+# Send to emergency contact
+MESSAGE_REQUEST.SEND_TO_EMERGENCY
+
+# Send to multiple recipients
+MESSAGE_REQUEST.SEND_TO_SELF_AND_GUARDIAN
+MESSAGE_REQUEST.SEND_TO_SELF_AND_EMERGENCY
+MESSAGE_REQUEST.SEND_TO_GUARDIAN_AND_EMERGENCY
+MESSAGE_REQUEST.SEND_TO_SELF_AND_GUARDIAN_AND_EMERGENCY
+```
+
+Example sending to students and guardians:
+
+```python
+msg_request = MessageRequest.objects.create(
+    subject="Important Program Update",
+    msgtext="...",
+    recipients=student_filter,
+    sendto_fn_name=MessageRequest.SEND_TO_SELF_AND_GUARDIAN,
+    creator=admin_user
+)
+```
+
+### TextOfEmail
+
+Contains the fully processed email ready to send:
+
+```python
+class TextOfEmail(models.Model):
+    messagerequest = models.ForeignKey(MessageRequest)
+    user = AjaxForeignKey(ESPUser)
+    send_to = models.CharField(max_length=1024)   # "Name" <email@example.com>
+    send_from = models.CharField(max_length=1024)
+    subject = models.TextField()  # Plain text
+    msgtext = models.TextField()  # Plain text or HTML
+    created_at = models.DateTimeField()
+    sent = models.DateTimeField(blank=True, null=True)
+    sent_by = models.DateTimeField(null=True)
+    tries = models.IntegerField(default=0)
+```
+
+#### Sending Emails
+
+```python
+# The send() method handles the actual SMTP transmission
+email = TextOfEmail.objects.get(id=some_id)
+result = email.send()
+
+if result is None:
+    print("Email sent successfully")
+else:
+    print(f"Error: {result}")
+```
+
+## Template Variables
+
+Use Django template syntax in email content:
+
+```python
+# Define message variables
+var_dict = {
+    'program': program_instance,
+    'user': user_instance
+}
+
+msg_request = MessageRequest.createRequest(
+    var_dict=var_dict,
+    subject="Welcome to {{ program.niceName }}!",
+    msgtext="""Dear {{ user.first_name }},
+    
+    Your confirmation link: {{ user.get_confirmation_link }}
+    Program starts: {{ program.startdate|date:"F j, Y" }}
+    """,
+    recipients=recipients_filter,
+    creator=admin_user
+)
+```
+
+### Available Context Variables
+
+- **user**: The recipient ESPUser object
+- **request**: The MessageRequest object
+- **EMAIL_HOST_SENDER**: Site email host from settings
+- Custom objects passed in `var_dict`
+
+## HTML Emails
+
+The system automatically detects HTML content and creates multipart emails:
+
+```python
+msg_request = MessageRequest.objects.create(
+    subject="Welcome!",
+    msgtext="""<html>
+    <body>
+        <h1>Welcome to {{ program.niceName }}!</h1>
+        <p>Dear {{ user.first_name }},</p>
+        <p>Thank you for registering.</p>
+    </body>
+    </html>""",
+    recipients=recipients_filter,
+    creator=admin_user
+)
+```
+
+The system generates both HTML and plain text versions automatically.
+
+## Email Headers
+
+### Custom Headers
+
+Add custom headers via the `special_headers_dict` property:
+
+```python
+msg_request = MessageRequest.objects.create(
+    subject="Newsletter",
+    msgtext="...",
+    recipients=recipients_filter,
+    creator=admin_user
+)
+
+# Add custom headers
+msg_request.special_headers_dict = {
+    'Reply-To': 'support@example.learningu.org',
+    'X-Program-ID': str(program.id)
+}
+msg_request.save()
+```
+
+### Unsubscribe Headers
+
+When sending to users, unsubscribe headers are automatically added:
+
+```python
+# Automatically added for emails with user parameter
+extra_headers['List-Unsubscribe-Post'] = "List-Unsubscribe=One-Click"
+extra_headers['List-Unsubscribe'] = '<{unsubscribe_url}>'
+```
+
+## Incoming Email
+
+### EmailList Configuration
+
+Incoming emails are routed based on regex patterns:
+
+```python
+from esp.dbmail.models import EmailList
+
+# Route class emails to students and teachers
+EmailList.objects.create(
+    regex=r'^(.+)-students@',
+    handler='class_mailman',
+    seq=10,
+    description='Class email lists'
+)
+```
+
+### Flow
+
+1. **MTA receives email** via SMTP at configured domain
+2. **Exim processes** according to `/etc/exim4` configuration
+3. **Mailgate script** (`esp/mailgates/mailgate.py`) consults `EmailList` objects
+4. **Email forwarded** to users based on matching handler
+
+### PlainRedirect
+
+Simple forwarding without logic:
+
+```python
+from esp.dbmail.models import PlainRedirect
+
+PlainRedirect.objects.create(
+    original='directors',
+    destination='admin1@example.com,admin2@example.com'
+)
+```
+
+Emails to `directors@yoursite.org` forward to both addresses.
+
+## send_mail Function
+
+Low-level function for sending emails directly:
+
+```python
+from esp.dbmail.models import send_mail
+
+send_mail(
+    subject="Test Email",
+    message="This is a test message.",
+    from_email="noreply@example.learningu.org",
+    recipient_list=["user@example.com"],
+    fail_silently=False,
+    extra_headers={'Reply-To': 'support@example.org'},
+    user=user_instance  # For unsubscribe headers
+)
+```
+
+<Warning>
+  The `from_email` must match your DMARC domains (typically `@yoursite.org` or `@learningu.org`) or the email may be rejected by recipients.
+</Warning>
+
+## SendGrid Configuration
+
+Modern email delivery requires domain authentication:
+
+1. Register domains with Gandi or AWS
+2. Authenticate with SendGrid
+3. Post unique records to domain registrar
+
+Use the automated script:
+
+```bash
+python /lu/scripts/sendgrid_authentication.py
+```
+
+This configures SPF, DKIM, and DMARC records for email authentication.
+
+## Expiring Old Emails
+
+Prevent old unsent emails from being sent:
+
+```python
+from esp.dbmail.models import expire_unsent_emails
+
+# Mark old unsent emails as sent
+expire_unsent_emails()
+```
+
+This is useful for preventing outdated messages from going out after system maintenance or bugs.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Test Email Templates">
+    Always test email templates with sample data before sending to large groups. Check both HTML and plain text versions.
+  </Accordion>
+
+  <Accordion title="Use Descriptive Subjects">
+    Include program name and purpose in subjects: `"[Splash 2024] Class Registration Confirmation"`
+  </Accordion>
+
+  <Accordion title="Validate From Addresses">
+    Ensure sender addresses match authenticated domains to prevent delivery issues.
+  </Accordion>
+
+  <Accordion title="Monitor Sent Emails">
+    Check `TextOfEmail.objects.filter(sent__isnull=True, tries__gt=3)` for delivery failures.
+  </Accordion>
+
+  <Accordion title="Clean Old Messages">
+    After events, clear message text to save database space:
+    ```python
+    TextOfEmail.objects.filter(sent__isnull=False).update(msgtext="")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Models
+
+See `esp/esp/dbmail/models.py` for:
+- `MessageVars`: Template variable storage
+- `EmailRequest`: User-message junction table
+- `ActionHandler`: Template context provider
+- `CustomSMTPBackend`: Custom return-path handling

@@ -1,122 +1,136 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "ESP Website",
+  "theme": "linden",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#8B0000",
+    "light": "#C41E3A",
+    "dark": "#5C0000"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/learning-unlimited/ESP-Website"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/learning-unlimited/ESP-Website"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/programs",
+              "concepts/classes",
+              "concepts/users",
+              "concepts/registration"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Administrator Guide",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "admin/overview",
+              "admin/creating-programs",
+              "admin/program-modules",
+              "admin/themes",
+              "admin/student-apps"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "User Workflows",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "workflows/student-registration",
+              "workflows/teacher-registration",
+              "workflows/onsite-checkin",
+              "workflows/volunteer-management"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Developer Guide",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Getting Started",
             "pages": [
-              "api-reference/introduction"
+              "dev/setup",
+              "dev/docker",
+              "dev/contributing"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Architecture",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "dev/architecture",
+              "dev/directory-structure",
+              "dev/models",
+              "dev/program-modules"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "dev/cache",
+              "dev/email",
+              "dev/tags",
+              "dev/utils"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "dev/deploying",
+              "dev/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/program",
+              "api/models/class",
+              "api/models/user",
+              "api/models/registration",
+              "api/models/resources"
+            ]
+          },
+          {
+            "group": "Program Modules",
+            "pages": [
+              "api/modules/overview",
+              "api/modules/student",
+              "api/modules/teacher",
+              "api/modules/admin",
+              "api/modules/onsite"
+            ]
+          },
+          {
+            "group": "Controllers",
+            "pages": [
+              "api/controllers/autoscheduler",
+              "api/controllers/lottery"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

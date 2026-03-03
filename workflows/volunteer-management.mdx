@@ -1,0 +1,388 @@
+---
+title: Volunteer Management
+description: Recruit, schedule, and manage volunteers for program activities and support roles
+---
+
+The volunteer management system allows programs to define volunteer opportunities, collect signups from interested individuals, and coordinate volunteer activities during events. It handles both the volunteer-facing signup process and administrative management.
+
+## Volunteer System Overview
+
+The volunteer system uses a request-and-offer model:
+
+- **Volunteer Requests**: Administrators create timeslots with volunteer needs
+- **Volunteer Offers**: Individuals sign up for specific timeslots
+- **Volunteer Management**: Administrators track and coordinate signups
+
+Volunteers can participate without requiring a pre-existing account, making signup accessible to community members.
+
+## Volunteer Registration Workflow
+
+<Steps>
+  <Step title="Create Volunteer Timeslots">
+    Administrators define when volunteers are needed:
+    
+    **Access**: `/manage/[program]/[instance]/volunteering`
+    
+    **Create Request Process**:
+    - Click to add a new volunteer shift
+    - Fill out the shift form:
+      - Select or create a timeslot
+      - Set number of volunteers needed
+      - Add shift description
+    - Submit to create the request
+    - Repeat for all volunteer needs
+    
+    **Timeslot Properties**:
+    - Start and end time
+    - Event type: "Volunteer"
+    - Description (e.g., "Registration desk", "Class monitor")
+    - Can span multiple hours or be short shifts
+    
+    **Managing Requests**:
+    - Edit existing volunteer requests
+    - Delete shifts if no longer needed
+    - View number of signups per shift
+    - See who has volunteered for each slot
+  </Step>
+
+  <Step title="Import Shifts from Previous Programs">
+    Save time by reusing volunteer schedules:
+    
+    **Import Process**:
+    - Click "Import shifts from another program"
+    - Select the previous program
+    - Choose start date for the new program
+    - Preview the shifts with adjusted dates
+    - Select which shifts to import
+    - Confirm import
+    
+    **What Gets Imported**:
+    - Timeslot times (adjusted by date difference)
+    - Number of volunteers needed per shift
+    - Shift descriptions
+    - Event types
+    
+    **Automatic Adjustments**:
+    - Calculates time difference between programs
+    - Shifts dates and times accordingly
+    - Preserves duration and time-of-day
+    - Creates new timeslots (doesn't duplicate existing ones)
+  </Step>
+
+  <Step title="Volunteers Sign Up">
+    Individuals register to volunteer:
+    
+    **Access**: `/volunteer/[program]/[instance]/signup`
+    
+    **Signup Form**:
+    - Name, email, and phone number
+    - Select available timeslots (checkboxes)
+    - Optional comments
+    - Submit to create volunteer offers
+    
+    **Account Creation**:
+    - If user is not logged in, an account is created automatically
+    - Account uses provided email and contact information
+    - User can log in later to manage signups
+    - Logged-in users use their existing account
+    
+    **Pre-filling Information**:
+    - Logged-in users have form pre-filled with their profile data
+    - Can update contact information if needed
+    - Previous volunteer information is remembered
+    
+    **Authentication**:
+    - By default, no login required (accessible to public)
+    - Can require authentication via `volunteer_require_auth` tag
+    - Balance accessibility with data security needs
+  </Step>
+
+  <Step title="View Volunteer Signups">
+    Administrators review who has volunteered:
+    
+    **Management Interface**: `/manage/[program]/[instance]/volunteering`
+    
+    **Information Displayed**:
+    - List of all volunteer requests/shifts
+    - Number of volunteers signed up for each
+    - Volunteer details (name, phone, email)
+    - Comments from volunteers
+    - Current vs. needed volunteer counts
+    
+    **Color Coding** (if implemented):
+    - Green: Fully staffed shifts
+    - Yellow: Partially staffed
+    - Red: Understaffed shifts
+  </Step>
+
+  <Step title="Export Volunteer Data">
+    Download volunteer information for offline use:
+    
+    **Access**: `/manage/[program]/[instance]/volunteering/csv`
+    
+    **CSV Export Includes**:
+    - Activity/shift name
+    - Time of shift
+    - Volunteer name
+    - Phone number
+    - Email address
+    - Volunteer comments
+    
+    **Uses for Export**:
+    - Print volunteer schedules
+    - Contact volunteers about changes
+    - Coordinate day-of assignments
+    - Track volunteer participation
+    - Import into other systems
+  </Step>
+
+  <Step title="Check Individual Volunteer Schedules">
+    View and edit specific volunteer commitments:
+    
+    **Access**: `/manage/[program]/[instance]/check_volunteer?user=[id]`
+    
+    **Admin View**:
+    - See all shifts a volunteer has signed up for
+    - Add volunteer to additional shifts
+    - Remove volunteer from shifts
+    - Update volunteer contact information
+    
+    **Volunteer View**: `/volunteer/[program]/[instance]/volunteerschedule`
+    - Volunteers can view their own schedule
+    - Print their volunteer commitments
+    - See shift details and times
+    - Get reminders of when to arrive
+  </Step>
+</Steps>
+
+## Volunteer Time Grouping
+
+Timeslots can be displayed grouped or ungrouped:
+
+**Ungrouped Display** (default):
+- All timeslots shown in chronological order
+- Simple list view
+- One checkbox per timeslot
+
+**Grouped Display**:
+- Enabled via `availability_group_timeslots` tag
+- Contiguous blocks shown together
+- Uses `prog.getTimeGroups(types=["Volunteer"])`
+- Helps volunteers understand shift structure
+- Useful for programs with many short timeslots
+
+## Volunteer Categories
+
+The system tracks different volunteer groups:
+
+### All Volunteers
+- Query: `volunteer_all`
+- Everyone who has signed up for any shift
+- Used for mass communications
+
+### Shift-Specific Volunteers
+- Query: `volunteer_[request_id]`
+- Volunteers for a particular shift/request
+- Targeted communications by activity
+- Example: `volunteer_42` for request ID 42
+
+### Querying Volunteers
+
+Programmatic access via `volunteers()` method:
+
+```python
+vol_dict = program.volunteers()
+vol_dict['volunteer_all']  # All volunteers
+vol_dict['volunteer_42']   # Specific shift
+```
+
+Returns Q objects or user querysets depending on `QObject` parameter.
+
+## Communication with Volunteers
+
+Use the Communications Panel to contact volunteers:
+
+**Recipient Lists**:
+- "All volunteers for [program]"
+- "Volunteers for [specific shift]"
+- Individual volunteers
+
+**Message Types**:
+- Confirmation emails after signup
+- Reminders before program
+- Day-of instructions and updates
+- Thank you messages after program
+- Schedule changes or cancellations
+
+## Volunteer Schedule Printables
+
+Volunteers can print their personal schedules:
+
+**Template**: Uses ProgramPrintables module template
+**Location**: `volunteerschedule.html`
+
+**Information Included**:
+- Volunteer name
+- All committed shifts
+- Shift times and descriptions
+- Where to report
+- Contact information for questions
+
+**Sorting**: Shifts sorted by start time for easy reference
+
+## Managing Volunteer Requests
+
+### Creating Requests
+
+Each volunteer request specifies:
+- Associated timeslot (when volunteers are needed)
+- Number of volunteers needed
+- Activity/role description
+
+### Editing Requests
+
+**To edit**:
+1. Click "Edit" next to the shift
+2. Form pre-fills with current values
+3. Modify fields as needed
+4. Submit to save changes
+
+**Editing affects**:
+- Display to new volunteers
+- Does not modify existing offers
+- Updates volunteer counts needed
+
+### Deleting Requests
+
+**To delete**:
+1. Click "Delete" next to the shift
+2. Confirm deletion
+3. Request and associated offers are removed
+
+**Warning**: Deleting removes all volunteer signups for that shift
+
+## Volunteer Data Model
+
+Key database objects:
+
+### VolunteerRequest
+- Links to Program
+- Links to Timeslot (Event)
+- Number of volunteers needed
+- Created by administrators
+
+### VolunteerOffer  
+- Links to VolunteerRequest
+- Links to User (volunteer)
+- Contact information (name, email, phone)
+- Comments from volunteer
+- Created when volunteers sign up
+
+### Relationships
+- One request can have many offers
+- One volunteer (user) can make many offers
+- Offers are specific to program and timeslot
+
+## Best Practices
+
+### Planning
+
+- **Identify needs early**: Determine all volunteer roles before signup opens
+- **Realistic numbers**: Request slightly more volunteers than minimum needed
+- **Clear descriptions**: Make shift descriptions specific and informative
+- **Reasonable lengths**: Keep shifts to 2-4 hours when possible
+- **Breaks**: Schedule overlapping shifts to allow volunteer breaks
+
+### Setup
+
+- **Import from past**: Save time by importing previous program schedules
+- **Test signup**: Verify the signup form works before publicizing
+- **Set deadline**: Use volunteer signup deadline to close registration
+- **Backup plan**: Have contingency for understaffed shifts
+
+### Recruitment
+
+- **Promote early**: Advertise volunteer opportunities well in advance
+- **Multiple channels**: Use email, social media, and community partners
+- **Clear benefits**: Explain what volunteers gain from participating
+- **Low barrier**: Keep signup process simple and quick
+- **Recognition**: Plan to thank and recognize volunteers
+
+### During Program
+
+- **Print schedules**: Have volunteer assignments printed and posted
+- **Check-in system**: Track which volunteers have arrived
+- **Flexibility**: Be ready to reassign volunteers as needs change
+- **Supervision**: Assign volunteer coordinators for each area
+- **Support**: Provide volunteers with breaks, food, and guidance
+
+### After Program
+
+- **Thank volunteers**: Send appreciation emails promptly
+- **Gather feedback**: Survey volunteers about their experience
+- **Document**: Note what worked well for next time
+- **Maintain relationships**: Keep volunteers engaged for future programs
+
+## Common Volunteer Roles
+
+Typical volunteer positions at ESP programs:
+
+- **Registration desk**: Check in students and distribute materials
+- **Class monitors**: Support teachers and manage classroom logistics  
+- **Floaters**: Fill in where needed and handle unexpected issues
+- **Food service**: Distribute meals and manage dining areas
+- **Setup/cleanup**: Prepare facilities before and after program
+- **Information desk**: Answer questions and provide directions
+- **Activities**: Run games, social events, or walk-in activities
+
+## Volunteer Permissions
+
+Volunteers may be granted special access:
+
+- View class rosters
+- Take attendance
+- Access onsite tools
+- Communicate with participants
+
+Configure via user permissions and tags as needed.
+
+## Integration with Other Modules
+
+### Onsite Module
+- Volunteer check-in tracking
+- Real-time volunteer coordination
+- Access to schedules and assignments
+
+### Communications Panel  
+- Send targeted messages to volunteer groups
+- Automated confirmation emails
+- Schedule reminders
+
+### User Management
+- Volunteer accounts created automatically
+- Volunteers can access their schedules
+- Reusable accounts for future programs
+
+## Troubleshooting
+
+**Volunteers can't sign up**:
+- Check if volunteer signup deadline is open
+- Verify volunteer requests exist
+- Confirm signup link is correct
+- Test with and without login
+
+**Imported shifts have wrong times**:
+- Verify start date is correct
+- Check timezone settings
+- Review timeslot event types
+- Import creates new events, check for duplicates
+
+**Export doesn't include all volunteers**:
+- Export includes all offers, not just confirmed
+- Check if offers were created successfully
+- Verify program association
+
+**Volunteer schedule is blank**:
+- Ensure ProgramPrintables module is enabled
+- Check that user has volunteer offers
+- Verify template exists

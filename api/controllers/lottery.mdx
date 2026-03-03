@@ -1,0 +1,516 @@
+---
+title: Lottery
+description: Class registration lottery system for assigning students to classes based on preferences
+---
+
+The lottery system allows students to express interest in classes and automatically assigns them based on priority levels, capacity constraints, and fairness algorithms.
+
+## Overview
+
+The lottery controller uses a weighted random selection algorithm to assign students to classes. It processes priority registrations first, then interested registrations, while enforcing constraints like grade requirements, lunch periods, and class capacity.
+
+## Core Components
+
+### LotteryAssignmentController
+
+The main controller for computing lottery assignments.
+
+**Location**: `esp/esp/program/controllers/lottery.py`
+
+#### Initialization
+
+```python
+from esp.program.controllers.lottery import LotteryAssignmentController
+
+controller = LotteryAssignmentController(program, **options)
+```
+
+**Default Options**:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Kp` | 1.2 | Weight factor for priority students |
+| `Ki` | 1.1 | Weight factor for interested students |
+| `check_grade` | True | Validate grade constraints |
+| `use_student_apps` | False | Use student application ranks |
+| `fill_low_priorities` | False | Auto-fill priorities from interested classes |
+| `max_timeslots` | 0 | Max timeslots per student (0 = unlimited) |
+| `max_sections` | 0 | Max sections per student (0 = unlimited) |
+| `stats_display` | False | Show detailed logging |
+| `directory` | $HOME | Directory for output files |
+
+#### Key Methods
+
+##### `compute_assignments(check_result=True)`
+
+Runs the lottery algorithm to assign students to classes.
+
+```python
+controller.compute_assignments()
+```
+
+**Algorithm**:
+1. Process priority levels from highest to lowest
+2. Within each level, randomize section order by duration (longest first)
+3. Fill each section with eligible students using weighted random selection
+4. Process interested (non-priority) students after all priorities
+5. Optional: repeat for different student application ranks
+
+##### `compute_stats(display=True)`
+
+Generates statistics about lottery results.
+
+```python
+stats = controller.compute_stats()
+```
+
+**Returns dict with**:
+- `num_lottery_students`: Total students in lottery
+- `num_enrolled_students`: Students enrolled in at least 1 class
+- `num_registrations`: Total enrollments created
+- `num_sections`: Available sections
+- `num_full_classes`: Sections filled to capacity
+- `overall_priority_ratio`: Fraction of priority requests fulfilled
+- `overall_interest_ratio`: Fraction of interested requests fulfilled
+- `overall_utility`: Weighted average student utility score
+- `students_by_screwedness`: List of (screwedness_score, student_id)
+- `hist_priority`: Histogram of (assigned, requested) pairs
+- `hist_interest`: Histogram of interested class assignments
+- `hist_timeslots_filled`: Distribution of timeslots per student
+
+##### `save_assignments(try_mailman=True)`
+
+Saves computed assignments to the database.
+
+```python
+controller.save_assignments()
+```
+
+This:
+1. Clears previous enrollments (expires them with `end_date`)
+2. Creates `StudentRegistration` objects with relationship `Enrolled`
+3. Updates mailman mailing lists (if configured)
+
+##### `clear_saved_assignments(delete=False)`
+
+Removes previous lottery results.
+
+```python
+# Expire old enrollments
+controller.clear_saved_assignments(delete=False)
+
+# Permanently delete
+controller.clear_saved_assignments(delete=True)
+```
+
+##### `export_assignments()` and `import_assignments(data)`
+
+Save and restore lottery results.
+
+```python
+# Export as compressed base64 string
+data = controller.export_assignments()
+
+# Restore from export
+controller.import_assignments(data)
+```
+
+##### `get_computed_schedule(student_id, mode='assigned')`
+
+Retrieves a student's schedule.
+
+```python
+# Get assigned classes
+classes = controller.get_computed_schedule(student_id, mode='assigned')
+
+# Get interested classes
+classes = controller.get_computed_schedule(student_id, mode='interested')
+
+# Get priority classes
+classes = controller.get_computed_schedule(student_id, mode='priority')
+classes = controller.get_computed_schedule(student_id, mode='priority_2')
+```
+
+##### `generate_screwed_csv(directory=None, n=None, stats=None)`
+
+Exports list of students with poor lottery outcomes.
+
+```python
+# Export top 100 most screwed students
+controller.generate_screwed_csv(n=100)
+```
+
+Creates CSV with columns: Student, Student ID, StudentScrewedScore, #Classes
+
+### Data Model
+
+The lottery uses NumPy arrays for efficient computation.
+
+#### Core Arrays
+
+**Student Preferences**:
+```python
+self.interest        # (num_students, num_sections) - interested flags
+self.priority        # List of (num_students, num_sections) arrays, one per priority level
+self.ranks           # (num_students, num_sections) - application ranks
+```
+
+**Section Information**:
+```python
+self.section_schedules         # (num_sections, num_timeslots) - when sections meet
+self.section_start_schedules   # (num_sections, num_timeslots) - section start times
+self.section_capacities        # (num_sections,) - max enrollment
+self.section_lengths           # (num_sections,) - duration in hours
+self.section_overlap           # (num_sections, num_sections) - same parent class
+self.section_grade_min         # (num_sections,) - min grade
+self.section_grade_max         # (num_sections,) - max grade
+```
+
+**Student State**:
+```python
+self.student_schedules    # (num_students, num_timeslots) - occupied timeslots
+self.student_sections     # (num_students, num_sections) - enrolled sections
+self.student_enrollments  # (num_students, num_timeslots) - section IDs by timeslot
+self.student_weights      # (num_students,) - lottery weights (lower = less likely)
+self.student_grades       # (num_students,) - student grade levels
+```
+
+**Lookup Tables**:
+```python
+self.student_ids       # Array of student IDs in order
+self.student_indices   # Map from student ID to array index
+self.section_ids       # Array of section IDs in order
+self.section_indices   # Map from section ID to array index
+self.timeslot_ids      # Array of timeslot IDs in order
+self.timeslot_indices  # Map from timeslot ID to array index
+```
+
+### Assignment Algorithm
+
+#### `fill_section(si, priority=False, rank=10)`
+
+Assigns students to a single section.
+
+**Location**: `esp/esp/program/controllers/lottery.py:343`
+
+**Algorithm**:
+1. Calculate available spaces (section capacity, program capacity)
+2. Get students who signed up for this section (priority or interested)
+3. Filter by constraints:
+   - Grade requirements (unless grade range exception)
+   - Application rank (if using student apps)
+   - Max sections enrolled
+   - Max timeslots used
+   - Available in all section timeslots
+   - Not in different section of same class
+   - Lunch constraint (at least one free lunch period)
+4. If more students than spaces:
+   - Use weighted random selection based on `student_weights`
+   - Students who got more classes have lower weights
+5. Update student schedules and enrollments
+6. Update student weights: divide by `Kp` (priority) or `Ki` (interested)
+
+**Returns**: `True` if section filled to capacity
+
+### Priority Levels
+
+Priority registrations are stored as `StudentRegistration` with relationship names like `Priority/1`, `Priority/2`, etc.
+
+**Priority limit**: Retrieved from `program.priorityLimit()`
+
+**Grade range exceptions**: If enabled, adds an extra "priority level" that ignores grade requirements. Stored as relationship `GradeRangeException`.
+
+### Constraints
+
+#### Grade Requirements
+
+Sections have `grade_min` and `grade_max`. Students must be in range unless:
+- `check_grade` option is False
+- Student has a grade range exception for that section
+
+#### Lunch Constraint
+
+If a section overlaps with a lunch period, students must have at least one other lunch period free.
+
+**Lunch detection**: Sections in the "Lunch" category.
+
+#### Scheduling Conflicts
+
+Students cannot:
+- Be enrolled in two sections at the same time
+- Be enrolled in multiple sections of the same class
+
+#### Capacity Limits
+
+Sections have hard capacity limits. Program may also have a `program_size_max` limiting total enrollment.
+
+### Weighting System
+
+Each student starts with weight 1.0. After each assignment:
+- Priority assignment: weight ÷= `Kp` (default 1.2)
+- Interested assignment: weight ÷= `Ki` (default 1.1)
+
+This makes students who already got classes less likely to get more, promoting fairness.
+
+### Utility Calculation
+
+Student utility measures satisfaction:
+
+```python
+utility = sqrt(interested_hours + 1.5 * priority_hours)
+```
+
+Overall utility is weighted by student engagement:
+
+```python
+weight = sqrt(num_classes_requested)
+overall_utility = sum(utility * weight) / sum(weight)
+```
+
+Screwedness score (lower = more screwed):
+
+```python
+screwedness = (1 + utility) / (1 + weight)
+```
+
+## Lottery Modules
+
+### LotteryStudentRegModule
+
+Student-facing registration interface.
+
+**Location**: `esp/esp/program/modules/handlers/lotterystudentregmodule.py`
+
+#### Module Properties
+
+```python
+module_properties = {
+    "link_title": "Class Registration Lottery",
+    "admin_title": "Lottery Student Registration",
+    "module_type": "learn",
+    "seq": 7,
+}
+```
+
+#### Key Methods
+
+##### `lotterystudentreg(request, ...)`
+
+Main student registration page. Uses AJAX for dynamic content.
+
+**Template selection**:
+- HSSP-style: `student_reg_hssp.html` (multi-level priorities)
+- Splash-style: `student_reg_splash.html` (single priority level)
+
+Based on `program.studentclassregmoduleinfo.use_priority` and `priority_limit`.
+
+##### `timeslots_json(request, ...)`
+
+Returns program timeslots as JSON.
+
+```json
+[
+  [timeslot_id, "Short description"],
+  ...
+]
+```
+
+**Cache**: 1 hour, public
+
+##### `viewlotteryprefs(request, ...)`
+
+Displays student's current lottery preferences.
+
+**Deadline**: Requires `/Classes/Lottery/View` permission
+
+##### `students(QObject=False)`
+
+Returns students who entered the lottery.
+
+```python
+students = module.students()
+# Returns: {'lotteried_students': QuerySet}
+```
+
+### LotteryFrontendModule
+
+Admin interface for running the lottery.
+
+**Location**: `esp/esp/program/modules/handlers/lotteryfrontendmodule.py`
+
+#### Module Properties
+
+```python
+module_properties = {
+    "admin_title": "Lottery Frontend",
+    "link_title": "Run the Lottery Assignment Thing",
+    "module_type": "manage",
+    "seq": 10,
+}
+```
+
+#### Key Methods
+
+##### `lottery(request, ...)`
+
+Main lottery control page.
+
+**Template**: `lottery.html`
+
+**Context**:
+```python
+{
+    'options': {k: v for k, v in default_options.items() if v[1] is not False},
+    'has_old_schedules': bool,
+}
+```
+
+##### `lottery_execute(request, ...)`
+
+AJAX endpoint to run the lottery.
+
+**Request**: POST with `lottery_*` parameters
+
+**Response**: JSON
+```json
+{
+  "response": [{
+    "stats": [...],
+    "lottery_data": "base64_encoded_string"
+  }]
+}
+```
+
+Or on error:
+```json
+{
+  "response": [{
+    "error_msg": "Error description"
+  }]
+}
+```
+
+##### `lottery_save(request, ...)`
+
+AJAX endpoint to save lottery results.
+
+**Request**: POST with `lottery_data` field (from `lottery_execute`)
+
+**Response**: JSON
+```json
+{
+  "response": [{
+    "success": "yes"
+  }]
+}
+```
+
+## Exception Handling
+
+The lottery defines custom exceptions:
+
+```python
+from esp.program.controllers.lottery import (
+    LotteryException,
+    LotterySectionException, 
+    LotterySubjectException
+)
+
+try:
+    controller.compute_assignments()
+except LotterySectionException as e:
+    # Section is not approved, not scheduled, etc.
+    print(f"Section error: {e}")
+except LotterySubjectException as e:
+    # Class is not approved, wrong program, etc.
+    print(f"Subject error: {e}")
+except LotteryException as e:
+    # Other lottery-related errors
+    print(f"Lottery error: {e}")
+```
+
+## Usage Example
+
+```python
+from esp.program.models import Program
+from esp.program.controllers.lottery import LotteryAssignmentController
+
+# Load program
+program = Program.objects.get(id=123)
+
+# Configure lottery
+options = {
+    'Kp': 1.3,              # Increase priority weight
+    'Ki': 1.15,             # Increase interested weight
+    'check_grade': True,    # Enforce grade requirements
+    'max_timeslots': 8,     # Limit to 8 timeslots per student
+    'stats_display': True,  # Show detailed logs
+}
+
+# Run lottery
+controller = LotteryAssignmentController(program, **options)
+controller.compute_assignments()
+
+# Review statistics
+stats = controller.compute_stats()
+print(f"Enrolled {stats['num_enrolled_students']} students")
+print(f"Priority fill rate: {stats['overall_priority_ratio']*100:.1f}%")
+print(f"Interest fill rate: {stats['overall_interest_ratio']*100:.1f}%")
+
+# Export for review
+data = controller.export_assignments()
+
+# ... admin reviews results ...
+
+# Import and save
+controller.import_assignments(data)
+controller.save_assignments()
+
+# Generate report of students who didn't get many classes
+controller.generate_screwed_csv(n=50)
+```
+
+## Two-Phase Registration
+
+Some programs use a two-phase system:
+
+**Phase 1**: Star students - mark classes as starred  
+**Phase 2**: Priority students - rank classes by priority
+
+The controller detects this:
+
+```python
+if 'twophase_star_students' in students:
+    stars = set(students['twophase_star_students'])
+    prioritys = set(students['twophase_priority_students'])
+    self.lotteried_students = list(stars | prioritys)
+```
+
+## Mailman Integration
+
+If `settings.USE_MAILMAN` is True, the lottery automatically updates mailing lists:
+
+- Program list: `{program_type}_{program_instance}-students`
+- Section lists: `{emailcode}-students`
+- Class lists: `{class_emailcode}-students`
+
+```python
+controller.save_assignments(try_mailman=True)
+
+# Or update lists separately
+controller.update_mailman_lists()
+```
+
+## Performance Considerations
+
+- The lottery loads all students, sections, and timeslots into memory as NumPy arrays
+- Computation is fast even for large programs (thousands of students)
+- Database save operation is slower due to creating many `StudentRegistration` objects
+- Use `stats_display=False` for production runs to reduce logging overhead
+
+## See Also
+
+- [Autoscheduler Controller](/api/controllers/autoscheduler) - For automatic room/time assignment
+- Student registration models in `esp/esp/program/models`
+- Registration types and relationships
+- Program module system

@@ -1,80 +1,467 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quickstart Guide"
+description: "Get started with ESP Website and create your first educational program"
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through setting up ESP Website and creating your first program. You'll learn how to:
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- Access the admin interface
+- Create a new program
+- Configure program modules
+- Set up time blocks and resources
+- Enable student and teacher registration
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  If you're setting up a local development environment, start with the [Installation Guide](/installation) first.
 </Note>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- A running ESP Website instance (Docker or production)
+- Admin/superuser access to the site
+- Basic understanding of your program structure (dates, time slots, etc.)
+
+## Step 1: Create a Superuser Account
+
+<Steps>
+  <Step title="Access the container">
+    If you're using Docker, open a terminal and run:
+    
+    ```bash
+    docker compose exec web python esp/manage.py createsuperuser
+    ```
+    
+    You'll be prompted to enter:
+    - Username
+    - Email address
+    - Password (entered twice)
+  </Step>
+  
+  <Step title="Verify access">
+    Navigate to `http://localhost:8000/admin` and log in with your credentials.
+    
+    You should see the Django admin interface with access to all models.
+  </Step>
+</Steps>
+
+<Warning>
+  Keep your superuser credentials secure. These provide full access to your ESP Website installation.
+</Warning>
+
+## Step 2: Create Your First Program
+
+<Steps>
+  <Step title="Navigate to program creation">
+    Go to `http://localhost:8000/manage/newprogram` or click on the "Programs" section in the admin interface.
+  </Step>
+  
+  <Step title="Fill out program details">
+    Complete the program creation form with the following information:
+    
+    <AccordionGroup>
+      <Accordion title="Basic Information">
+        - **Program name**: e.g., "Splash 2026"
+        - **Program type**: Choose from Splash, HSSP, or create a custom type
+        - **URL identifier**: Short name used in URLs (e.g., "Splash")
+        - **Instance identifier**: Specific instance (e.g., "2026")
+      </Accordion>
+      
+      <Accordion title="Dates & Times">
+        - **Start date**: When your program begins
+        - **End date**: When your program ends
+        - **Registration start**: When registration opens
+        - **Registration end**: When registration closes
+      </Accordion>
+      
+      <Accordion title="Program Modules">
+        Select which modules to enable for your program:
+        
+        **Essential Student Modules:**
+        - StudentRegCore (required for student registration)
+        - StudentClassRegModule (class browsing and enrollment)
+        - RegProfileModule (student profile editor)
+        
+        **Essential Teacher Modules:**
+        - TeacherRegCore (required for teacher registration)
+        - TeacherClassRegModule (class creation)
+        - AvailabilityModule (teacher availability)
+        
+        **Essential Admin Modules:**
+        - AdminCore (required)
+        - AdminClass (class management)
+        - AJAXSchedulingModule (visual scheduler)
+      </Accordion>
+      
+      <Accordion title="Financial Settings">
+        - **Program cost**: Base registration fee
+        - **Sibling discount**: Optional discount for families
+        - **Financial aid**: Enable financial aid applications
+      </Accordion>
+    </AccordionGroup>
+  </Step>
+  
+  <Step title="Create the program">
+    Click **"Create Program"** to save your new program.
+    
+    You'll be redirected to the program management dashboard.
+  </Step>
+</Steps>
+
+<Check>
+  Your program is now created! You can access it at `http://localhost:8000/manage/[program]/[instance]/`
+</Check>
+
+## Step 3: Configure Time Blocks and Resources
+
+Before teachers can create classes, you need to set up when classes can meet and where they can be held.
+
+<Steps>
+  <Step title="Access resource management">
+    From your program dashboard, click **"Manage Resources"** or navigate to:
+    
+    `http://localhost:8000/manage/[program]/[instance]/resources`
+  </Step>
+  
+  <Step title="Create time blocks">
+    Click **"Manage Times"** to create time slots for classes.
+    
+    <CodeGroup>
+    ```text Example: Saturday Morning Session
+    Start: 2026-03-14 09:00:00
+    End:   2026-03-14 10:00:00
+    ```
+    
+    ```text Example: Saturday Afternoon Session
+    Start: 2026-03-14 10:00:00
+    End:   2026-03-14 11:00:00
+    ```
+    </CodeGroup>
+    
+    Create as many time blocks as needed for your program schedule.
+  </Step>
+  
+  <Step title="Add classrooms">
+    Click **"Manage Rooms"** to add classroom resources.
+    
+    For each room, specify:
+    - **Room name/number**: e.g., "Room 101"
+    - **Capacity**: Maximum students
+    - **Resource types**: Available equipment (projector, whiteboard, etc.)
+    
+    <Tip>
+      You can bulk import rooms using the CSV upload feature if you have many classrooms.
+    </Tip>
+  </Step>
+  
+  <Step title="Configure resource types (optional)">
+    Create resource types for special equipment:
+    - Projectors
+    - Computers
+    - Lab equipment
+    - Outdoor spaces
+    
+    Teachers can request these when creating classes.
+  </Step>
+</Steps>
+
+## Step 4: Configure Program Settings
+
+Customize your program's behavior with tags and module settings.
+
+<Steps>
+  <Step title="Access program settings">
+    From the program dashboard, click **"Edit Program Settings"** or go to the admin panel:
+    
+    `http://localhost:8000/admin/program/program/`
+  </Step>
+  
+  <Step title="Configure module settings">
+    Adjust settings for individual modules:
+    
+    **Student Class Registration:**
+    - Enforce max capacity
+    - Class cap multiplier (for soft caps)
+    - Visible enrollments (show class fullness)
+    - Visible meeting times
+    
+    **Teacher Class Registration:**
+    - Allow class imports from previous programs
+    - Require class approval
+    - Maximum class duration
+  </Step>
+  
+  <Step title="Set up tags (optional)">
+    Tags provide fine-grained control over program behavior. Common tags:
+    
+    ```text Common Tag Examples
+    require_school_field: Make school field required
+    allow_change_grade_level: Let students update grade
+    teacherreg_difficulty_choices: Customize difficulty levels
+    student_grade_options: Specify allowed grade levels
+    ```
+    
+    Add tags at: `http://localhost:8000/admin/tagdict/tag/`
+  </Step>
+</Steps>
+
+## Step 5: Set Registration Deadlines
+
+Control when different registration phases open and close.
+
+<Steps>
+  <Step title="Access deadline management">
+    From the program dashboard, click **"Manage Deadlines"**.
+  </Step>
+  
+  <Step title="Configure teacher deadlines">
+    Set deadlines for teacher registration phases:
+    
+    <CodeGroup>
+    ```text Teacher Registration
+    Type: Teacher Registration
+    Opens: 2 weeks before program
+    Closes: 1 week before program
+    ```
+    
+    ```text Teacher Class Submission
+    Type: Teacher Class Creation
+    Opens: 2 weeks before program
+    Closes: 10 days before program
+    ```
+    
+    ```text Teacher Availability
+    Type: Teacher Availability
+    Opens: 2 weeks before program
+    Closes: 1 week before program
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Configure student deadlines">
+    Set deadlines for student registration:
+    
+    <CodeGroup>
+    ```text Student Registration
+    Type: Student Registration
+    Opens: 1 week before program
+    Closes: 1 day before program
+    ```
+    
+    ```text Student Class Selection
+    Type: Student Class Signup
+    Opens: 1 week before program
+    Closes: 1 day before program
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Set payment deadlines (if applicable)">
+    ```text Payment Deadline
+    Type: Pay for a program
+    Opens: When registration opens
+    Closes: Day before program
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Deadlines control access to different parts of the registration process. Students and teachers can only access modules during their active deadline periods.
+</Note>
+
+## Step 6: Schedule Classes
+
+Once teachers have submitted classes, use the AJAX scheduler to assign them to rooms and times.
+
+<Steps>
+  <Step title="Review and approve classes">
+    Navigate to the program dashboard and click **"Manage Classes"**.
+    
+    Review submitted classes and approve them for scheduling.
+  </Step>
+  
+  <Step title="Open the scheduler">
+    Click **"AJAX Scheduling Module"** from the program management page.
+    
+    You'll see a grid interface with:
+    - Rooms (rows)
+    - Time blocks (columns)
+    - Unscheduled classes (sidebar)
+  </Step>
+  
+  <Step title="Schedule classes">
+    To schedule a class:
+    
+    1. Click on a class in the sidebar to select it
+    2. Green cells indicate valid placement locations
+    3. Yellow cells show teacher conflicts
+    4. Click a green cell to place the class
+    
+    <Tip>
+      Use keyboard shortcuts:
+      - `ESC`: Deselect class
+      - `DEL`: Unschedule selected class
+      - `F1`: Switch to directory
+      - `F2`: Switch to filters
+      - `/`: Focus search box
+    </Tip>
+  </Step>
+  
+  <Step title="Verify the schedule">
+    Check for scheduling errors in the upper-right panel.
+    
+    Common issues:
+    - Teacher conflicts (teaching multiple classes at once)
+    - Room capacity exceeded
+    - Teacher not available at scheduled time
+  </Step>
+</Steps>
+
+## Step 7: Enable Student Registration
+
+Now that classes are scheduled, students can register!
+
+<Steps>
+  <Step title="Verify student deadlines">
+    Ensure the "Student Registration" deadline is open.
+  </Step>
+  
+  <Step title="Test student flow">
+    Create a test student account and walk through registration:
+    
+    1. Navigate to `http://localhost:8000/learn/[program]/[instance]/studentreg`
+    2. Fill out the student profile
+    3. Browse the class catalog
+    4. Register for classes
+    5. View your schedule
+    
+    <Tip>
+      Use the "User Morphing" admin module to view the site as different users without logging out.
+    </Tip>
+  </Step>
+  
+  <Step title="Monitor registration">
+    Track registration progress from the program dashboard:
+    
+    - Number of registered students
+    - Number of confirmed registrations
+    - Class enrollment statistics
+    - Payment status
+  </Step>
+</Steps>
+
+## Step 8: Communications
+
+Stay in touch with participants using the built-in communications system.
+
+<Steps>
+  <Step title="Access communications panel">
+    From the program dashboard, click **"Communications Panel"**.
+  </Step>
+  
+  <Step title="Select recipients">
+    Choose who should receive your message:
+    
+    - All registered students
+    - Students in specific classes
+    - All teachers
+    - Teachers teaching specific subjects
+    - Custom combinations using Boolean logic
+    
+    <Warning>
+      Always verify the recipient count before sending. Use the "Recipient Checklist" to see specific users.
+    </Warning>
+  </Step>
+  
+  <Step title="Compose and send">
+    Use the rich text editor to compose your message:
+    
+    - Bold, italic, underline formatting
+    - Lists and tables
+    - Template tags (student name, class info, etc.)
+    - Images from external sources
+    
+    Click **"Send Email"** when ready.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Program Modules Guide"
+    icon="puzzle-piece"
+    href="/admin/program-modules"
+  >
+    Learn about all available modules and how to configure them
+  </Card>
+  <Card
+    title="Advanced Scheduling"
+    icon="calendar"
+    href="/api/controllers/autoscheduler"
+  >
+    Master the AJAX scheduler with advanced techniques
+  </Card>
+  <Card
+    title="Payment Processing"
+    icon="credit-card"
+    href="/admin/overview"
+  >
+    Set up Stripe or Cybersource for accepting payments
+  </Card>
+  <Card
+    title="Customization"
+    icon="palette"
+    href="/admin/themes"
+  >
+    Customize themes, templates, and program behavior with tags
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Students can't see classes">
+    **Check:**
+    - Is the "Student Class Signup" deadline open?
+    - Are classes approved and scheduled?
+    - Is the StudentClassRegModule enabled?
+    - Are classes marked as "accepted" status?
+  </Accordion>
+  
+  <Accordion title="Teachers can't create classes">
+    **Check:**
+    - Is the "Teacher Class Creation" deadline open?
+    - Is the TeacherClassRegModule enabled?
+    - Have time blocks been created?
+    - Does the teacher have the correct permissions?
+  </Accordion>
+  
+  <Accordion title="Can't schedule a class">
+    **Check:**
+    - Is the teacher available at that time?
+    - Does the room have sufficient capacity?
+    - Is the class duration a valid length?
+    - Are there any existing conflicts?
+  </Accordion>
+  
+  <Accordion title="Emails aren't sending">
+    **Check:**
+    - Email configuration in `local_settings.py`
+    - SMTP server credentials
+    - Email queue (check `/admin/dbmail/emailrequest/`)
+    - Run `python manage.py send_email_proc` to process queue
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+If you run into issues:
+
+- Check the [LU Wiki](https://wiki.learningu.org) for detailed documentation
+- Search [GitHub Issues](https://github.com/learning-unlimited/ESP-Website/issues)
+- Ask in the Learning Unlimited community channels
+- Contact web-team@learningu.org for support

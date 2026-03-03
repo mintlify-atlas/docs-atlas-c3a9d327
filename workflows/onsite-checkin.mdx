@@ -1,0 +1,306 @@
+---
+title: Onsite Check-In
+description: Check in students on the day of the program, verify payments, and track attendance
+---
+
+The onsite check-in system allows program staff to efficiently register student arrivals, verify payment and form completion, and track attendance throughout the program. Multiple check-in methods are available to handle different volumes and scenarios.
+
+## Check-In Overview
+
+The check-in module tracks several important records for each student:
+
+- **Attendance**: Whether the student has checked in to the program
+- **Payment**: Whether the student has paid their program fees
+- **Medical Form**: Whether required medical information has been submitted
+- **Liability Form**: Whether required liability waiver has been signed
+
+All check-in functions are available at `/onsite/[program]/[instance]/` for authorized onsite staff.
+
+## Check-In Methods
+
+<Steps>
+  <Step title="Rapid Check-In">
+    The fastest method for basic attendance tracking:
+    
+    **Access**: `/onsite/[program]/[instance]/rapidcheckin`
+    
+    **Process**:
+    - Student provides name or user ID
+    - Staff searches for the student
+    - System marks student as attended
+    - Displays confirmation message
+    - Ready for next student immediately
+    
+    **Best for**:
+    - High-volume check-in at program start
+    - Simple attendance tracking only
+    - When payment is handled separately
+    
+    **Features**:
+    - AJAX-enabled for fast, page-free updates
+    - Shows real-time statistics (grades, start times)
+    - Only checks in valid students (not teachers or admins)
+    - Prevents duplicate check-ins
+  </Step>
+
+  <Step title="Barcode Check-In (Batch)">
+    Efficient for processing multiple students at once:
+    
+    **Access**: `/onsite/[program]/[instance]/barcodecheckin`
+    
+    **Setup**:
+    - Students have barcodes with their user IDs
+    - Can be printed on registration confirmations
+    - Barcode scanner or manual ID entry
+    
+    **Process**:
+    - Scan or enter multiple student IDs (space-separated)
+    - Select which records to create:
+      - [ ] Attended
+      - [ ] Paid
+      - [ ] Medical form
+      - [ ] Liability form
+    - Submit to process all students at once
+    
+    **Results Display**:
+    - New check-ins: Students successfully processed
+    - Existing: Students already checked in
+    - Not found: Invalid user IDs
+    - Not student: IDs belonging to non-students
+    - Separate counts for payment, medical, and liability
+    
+    **Best for**:
+    - Pre-registered students with printed barcodes
+    - Batch processing at off-peak times
+    - Stations dedicated to specific tasks (e.g., payment verification)
+  </Step>
+
+  <Step title="AJAX Barcode Check-In (Single)">
+    Real-time single-student processing with immediate feedback:
+    
+    **Access**: `/onsite/[program]/[instance]/ajaxbarcodecheckin` (API endpoint)
+    
+    **POST Parameters**:
+    ```
+    code: [student user ID]
+    attended: true/false
+    paid: true/false
+    med: true/false
+    liab: true/false
+    ```
+    
+    **Response**:
+    - JSON with success/error message
+    - Immediate confirmation
+    - No page reload required
+    
+    **Best for**:
+    - Custom check-in interfaces
+    - Integrated barcode scanning systems
+    - Mobile check-in apps
+  </Step>
+
+  <Step title="Full Check-In Interface">
+    Comprehensive check-in with complete student information:
+    
+    **Access**: `/onsite/[program]/[instance]/checkin`
+    
+    **Process**:
+    1. Search for student by name, email, or ID
+    2. View student details and current status
+    3. Toggle checkboxes for:
+       - Attended
+       - Paid
+       - Medical form submitted
+       - Liability form submitted
+    4. Special actions:
+       - Undo last check-in
+       - Undo last check-out
+    5. Submit to update all records
+    
+    **Information Displayed**:
+    - Student name and contact info
+    - Registration status
+    - Payment balance
+    - Check-in history and timestamps
+    - Classes enrolled
+    
+    **Best for**:
+    - Handling complex situations
+    - Resolving payment issues
+    - Students with questions
+    - Making corrections to records
+  </Step>
+</Steps>
+
+## Check-In and Check-Out Tracking
+
+The system maintains detailed attendance records:
+
+### Check-In Records
+
+- **First check-in**: Creates "attended" record with timestamp
+- **Multiple check-ins**: Each creates a new attended record
+- **Check-in time**: Retrievable via `timeCheckedIn()` or `lastCheckedIn()`
+- **Currently checked in**: Based on most recent attended/checked_out record
+
+### Check-Out Process
+
+- Students can check out when leaving
+- Creates "checked_out" record with timestamp
+- Allows tracking of on-campus presence
+- Can check back in when returning
+- Forms pairs of check-in/check-out records
+
+### Attendance History
+
+- View all check-in/check-out pairs via `checkinPairs()`
+- Each pair shows:
+  - Check-in time
+  - Check-out time (if checked out)
+- Useful for tracking program attendance patterns
+- Helps with safety and accountability
+
+## Status Monitoring
+
+The check-in status view provides real-time statistics:
+
+**Access**: `/onsite/[program]/[instance]/ajax_status`
+
+**Available Snippets**:
+
+- **Grades**: Breakdown of checked-in students by grade level
+- **Times**: Distribution by first class start time  
+- **Students**: Full list of checked-in students
+
+**Query Parameters**:
+```
+?snippets=grades,times,students
+```
+
+**Use Cases**:
+- Monitor check-in progress
+- Identify bottlenecks
+- Ensure balanced distribution
+- Track against expected attendance
+
+## Payment Verification
+
+### Recording Payments
+
+When marking a student as paid:
+
+- Sets accounting records to "paid in full"
+- Updates via `IndividualAccountingController`
+- Applied to outstanding balances
+- Cannot be undone from check-in interface (use admin panel)
+
+### Payment Status Checks
+
+- `hasPaid()`: Returns true if student has paid in full
+- Considers financial aid grants
+- Includes all line items (admission, meals, etc.)
+- Reflects real-time accounting state
+
+### Handling Partial Payments
+
+For students with partial payments:
+
+- Use full check-in interface to see balance
+- Verify remaining amount owed
+- Accept additional payment
+- Mark paid only when balance is zero
+
+## Form Verification
+
+### Medical Forms
+
+- Records: "med" event type
+- May be submitted via Formstack integration
+- Can be verified at check-in
+- Required for programs with medical needs
+
+### Liability Forms
+
+- Records: "liab" event type
+- Legal waiver acknowledgment
+- Often required for all participants
+- May be digital or paper-based
+
+### Creating Records
+
+The `create_record(event)` method:
+
+- Checks for existing records
+- Creates new record if needed
+- Returns whether record was newly created
+- Prevents duplicates for most record types
+- Special handling for "attended" (allows multiples)
+
+### Deleting Records
+
+The `delete_record(event)` method:
+
+- For "attended": Creates check-out record instead
+- For "paid": Marks as unpaid via accounting controller
+- For other events: Deletes the record
+- Use with caution - only for corrections
+
+## Student Validation
+
+The system validates that check-in subjects are students:
+
+- Checks `user.isStudent()` returns true
+- Excludes teachers, even if they have student accounts
+- Prevents checking in administrators
+- Reports non-students separately in results
+
+## Best Practices
+
+### Setup
+
+- Train staff on all check-in methods before program day
+- Test barcode scanners and equipment in advance
+- Print student barcodes on registration confirmations
+- Set up multiple check-in stations for large programs
+- Assign specific stations for specific tasks (attendance, payment)
+
+### During Check-In
+
+- Use rapid check-in for simple attendance at peak times
+- Switch to full interface for students with questions
+- Batch process pre-paid students with barcode check-in
+- Monitor real-time statistics to track progress
+- Have admin access available for exception handling
+
+### Troubleshooting
+
+- **Student not found**: Verify they registered and confirm their ID
+- **Already checked in**: Use full interface to view history
+- **Payment discrepancy**: Check admin accounting panel for details  
+- **Wrong record created**: Use undo functions or delete via full interface
+
+### Data Quality
+
+- Verify payment records match cash/checks received
+- Confirm form submission records are accurate
+- Use check-out feature to track students leaving early
+- Review check-in statistics after program for analysis
+
+## Security Considerations
+
+- Check-in requires `needs_onsite` permission
+- Only authorized staff can access check-in functions
+- Payment records affect financial data - use carefully
+- Form records may have legal implications
+- All actions are logged with timestamps and user info
+
+## Integration with Other Systems
+
+Check-in data is used by:
+
+- **Email targeting**: Send messages to checked-in students
+- **Class attendance**: Link to per-class attendance tracking
+- **Analytics**: Program attendance patterns and statistics
+- **Financial reports**: Reconcile payments with accounting
+- **Safety**: Know who is on-campus at any time

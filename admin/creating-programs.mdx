@@ -1,0 +1,408 @@
+---
+title: Creating Programs
+description: Step-by-step guide to creating and configuring new programs in the ESP Website platform
+---
+
+Creating a new program in the ESP Website involves setting up the basic program structure, configuring deadlines, and selecting which features (modules) to include.
+
+## Accessing the Program Creation Form
+
+Navigate to the program creation form:
+
+```
+https://[yoursite].learningu.org/manage/newprogram
+```
+
+<Note>
+You must have administrator permissions to create programs.
+</Note>
+
+## Using a Template Program
+
+The easiest way to create a new program is to use a previous program as a template. At the top of the form, you'll see a dropdown menu to select a template:
+
+```
+Use a past program as a template: [Select Program]
+```
+
+When you select a template program, the form will pre-populate with:
+
+- **Program settings**: Name format, grade range, program size
+- **Registration dates**: Student and teacher registration windows
+- **Costs**: Base program cost and sibling discount
+- **Teacher class registration settings**: All customizations from ClassRegModuleInfo
+- **Student class registration settings**: All customizations from StudentClassRegModuleInfo
+- **Tag settings**: Configuration tags (with some exceptions)
+- **Module configuration**: Enabled modules, sequence numbers, and required status
+
+<Warning>
+If you use a template, carefully review ALL fields below before submitting. Update dates, program names, and any settings specific to your new program. The form will copy most settings automatically, but you must verify they're correct for your new program.
+</Warning>
+
+### What Gets Copied from Templates
+
+When using a template, these settings are automatically imported:
+
+<Accordion title="Module Settings">
+- Which modules are enabled
+- Module sequence numbers (display order)
+- Required vs. optional modules
+- Module-specific configuration (CRMI, SCRMI)
+</Accordion>
+
+<Accordion title="Tags">
+Most tag settings are copied, **except**:
+- `learn_extraform_id` (custom student forms)
+- `teach_extraform_id` (custom teacher forms)
+- `quiz_form_id` (teacher quiz)
+- `student_lottery_run` (lottery state)
+
+These are program-specific and should be set up fresh.
+</Accordion>
+
+<Accordion title="Registration Settings">
+- Teacher class registration customizations
+- Student class registration customizations
+- Capacity multipliers and offsets
+- Priority limits
+- Signup verbs and registration types
+</Accordion>
+
+## Program Creation Form Fields
+
+The form is organized into fieldsets covering different aspects of your program:
+
+### Basic Information
+
+<Steps>
+  <Step title="Program Type">
+    Select the type of program:
+    - **Splash**: Standard weekend program
+    - **HSSP**: Longer-term Saturday program
+    - **Junction**: Extended after-school program
+    - Custom types specific to your organization
+    
+    This determines the URL structure: `/learn/[program_type]/[instance]`
+  </Step>
+  
+  <Step title="Program Instance">
+    A short identifier for this specific instance (e.g., "2024_Fall", "Summer2024").
+    
+    Should be unique within the program type.
+  </Step>
+  
+  <Step title="Friendly Name">
+    The display name users will see (e.g., "Splash Fall 2024", "HSSP Summer 2024").
+  </Step>
+  
+  <Step title="Director Email">
+    Primary contact email for the program. Used for:
+    - Admin notifications
+    - Mailing list ownership
+    - Default "from" address for some emails
+  </Step>
+</Steps>
+
+### Grade Range
+
+Define which grades can participate:
+
+- **Grade Min**: Lowest grade level (typically 7 for middle school programs)
+- **Grade Max**: Highest grade level (typically 12 for high school programs)
+
+These are used to:
+- Filter students during registration
+- Populate grade selection dropdowns
+- Determine class eligibility
+
+### Program Size
+
+Optional field to set expected capacity. Used by:
+
+- Phase Zero lottery (student selection)
+- Capacity planning
+- Statistics and reporting
+
+Can be further refined with the `program_size_by_grade` tag.
+
+### Registration Dates
+
+Set the overall registration windows:
+
+<Accordion title="Student Registration">
+**Student Reg Start**: When students can begin registering
+
+**Student Reg End**: Last day for student registration
+
+These create the foundational student deadlines. You'll refine specific features (profile editing, class selection, payment) through the deadline management interface after program creation.
+</Accordion>
+
+<Accordion title="Teacher Registration">
+**Teacher Reg Start**: When teachers can begin submitting classes
+
+**Teacher Reg End**: Last day for teacher class submission
+
+Similar to student registration, you'll set specific deadline types (class creation, availability, bio) through deadline management.
+</Accordion>
+
+**Date Format**: Enter dates as:
+- `9/1/2024` (midnight)
+- `9/1/2024 17:30` (5:30 PM)
+
+### Program Costs
+
+<Accordion title="Base Cost">
+The standard admission price in dollars (without the $ symbol).
+
+Creates a line item type called "Program admission" that appears on student invoices.
+
+Set to `0` for free programs.
+</Accordion>
+
+<Accordion title="Sibling Discount">
+Discount amount (in dollars) for students with siblings also attending.
+
+When enabled:
+- Creates a "Sibling discount" line item type
+- Students can specify siblings during registration
+- Discount automatically applies to invoices
+- Appears as option in StudentExtraCosts module
+
+Set to `0` to disable sibling discounts.
+</Accordion>
+
+### Program Modules
+
+Select which modules to enable for this program. Modules are grouped by category:
+
+<Accordion title="Student Modules">
+Features for student registration:
+- Student Profile Editor
+- Student Class Registration
+- Financial Aid Application
+- Optional Items for Purchase (meals, t-shirts)
+- Student Acknowledgement
+- Donation Module
+- Student Surveys
+- Student Onsite Webapp
+
+See [Program Modules](./program-modules) for detailed descriptions.
+</Accordion>
+
+<Accordion title="Teacher Modules">
+Features for teacher registration:
+- Teacher Profile Editor
+- Teacher Signup Classes
+- Teacher Availability
+- Teacher Biography
+- Teacher Training/Interview Signups
+- Teacher Preview (view other classes)
+- Teacher Quiz
+- Teacher Acknowledgement
+- Teacher Onsite Webapp
+
+See [Program Modules](./program-modules) for detailed descriptions.
+</Accordion>
+
+<Accordion title="Management Modules">
+Admin tools (most should be enabled):
+- **AdminCore** (required - provides dashboard)
+- **AdminClass** (required - class approval and management)
+- **JSONDataModule** (required - data for other modules)
+- AdminVitals (statistics)
+- CommModule (email communication)
+- ResourceModule (timeslots, classrooms)
+- AjaxSchedulingModule (class scheduling)
+- SchedulingCheckModule (validate schedule)
+- ProgramPrintables (PDF generation)
+- ListGenModule (user lists/exports)
+- And many more...
+
+See [Program Modules](./program-modules) for detailed descriptions.
+</Accordion>
+
+<Accordion title="Onsite Modules">
+Day-of-program features:
+- OnsiteCore (required if using any onsite features)
+- OnSiteCheckinModule (student check-in)
+- OnSiteClassList (class changes grid)
+- OnSiteClassSchedule (schedule modifications)
+- OnsitePaidItemsModule (view purchases)
+- OnsitePrintSchedules (automated printing)
+- OnSiteRegister (walk-in registration)
+</Accordion>
+
+<Accordion title="Volunteer Modules">
+Volunteer management:
+- VolunteerSignup (volunteer registration)
+- VolunteerManage (admin volunteer scheduling)
+</Accordion>
+
+<Note>
+If you select a template program, module selections will be ignored and the template's modules will be used instead.
+</Note>
+
+## Creating the Program
+
+After filling out the form:
+
+<Steps>
+  <Step title="Review All Fields">
+    Double-check all information, especially:
+    - Program name and instance
+    - Registration dates
+    - Grade range
+    - Costs
+    - Director email
+  </Step>
+  
+  <Step title="Submit the Form">
+    Click the "Make Program Happen!" button at the bottom.
+  </Step>
+  
+  <Step title="Automatic Setup">
+    The system will:
+    - Create the program database entry
+    - Generate initial deadlines from registration dates
+    - Enable selected modules (or copy from template)
+    - Create default resource types (from `default_restypes` tag)
+    - Set up ClassRegModuleInfo and StudentClassRegModuleInfo
+    - Create mailing lists (if Mailman is configured)
+  </Step>
+  
+  <Step title="Redirect to Resources">
+    You'll be redirected to:
+    ```
+    /manage/[program]/[instance]/resources
+    ```
+    This is the resource management page where you **must** set up timeslots and classrooms.
+  </Step>
+</Steps>
+
+## Immediate Next Steps
+
+After creating a program, complete these essential tasks:
+
+### 1. Set Up Timeslots
+
+<Warning>
+Timeslots are **required** before teachers can register classes. Set these up immediately.
+</Warning>
+
+In the Resource Module:
+
+1. Create timeslots for your program
+2. Specify start and end times
+3. Or import from a previous program with the same number of days
+
+**Do not delete timeslots** after creation unless you understand the consequences - they may be referenced by classes and availability records.
+
+### 2. Configure Classrooms
+
+Add classrooms with:
+- Room name/number
+- Capacity (number of students)
+- Resources (projector, whiteboard, etc.)
+
+### 3. Refine Deadlines
+
+Visit the dashboard and click "Deadline Management" to:
+
+- Add specific deadline types (Student/Classes, Teacher/Classes, etc.)
+- Set precise opening and closing times
+- Create deadlines for surveys, payments, etc.
+
+### 4. Customize Module Settings
+
+Many modules have additional configuration:
+
+- Edit program module objects at `/admin/modules/programmoduleobj/`
+- Set sequence numbers (display order)
+- Mark modules as required or optional
+- Add required labels (e.g., "Required for outside teachers")
+
+### 5. Configure Module-Specific Settings
+
+Depending on which modules you enabled:
+
+- **ClassRegModuleInfo** at `/admin/modules/classregmoduleinfo/`
+- **StudentClassRegModuleInfo** at `/admin/modules/studentclassregmoduleinfo/`
+- Create Tags at `/admin/tagdict/tag/` for advanced customization
+
+See [Program Modules](./program-modules) for module-specific configuration details.
+
+## Mailing Lists
+
+If Mailman is configured, the system automatically creates:
+
+```
+[program_type]_[instance]-teachers
+[program_type]_[instance]-students
+```
+
+With:
+- Moderator: Program director email + mailman_moderator address
+- Subscribers: Director email + archive address (if configured)
+- Settings: Loaded from `lists/program_mailman.config`
+
+## Advanced: Program Tags
+
+After creation, you can add program-specific tags for fine-grained control:
+
+- `require_school_field`: Make school required in student profile
+- `require_guardian_email`: Require parent email
+- `allow_change_grade_level`: Let students change grade
+- `studentschedule_show_empty_blocks`: Show timeslots without classes
+- `donation_settings`: Customize donation options
+- `stripe_settings`: Override Stripe module defaults
+- And many more...
+
+Create tags at `/admin/tagdict/tag/`, selecting:
+- **Content type**: Program
+- **Object ID**: Your program's ID (from `/admin/program/program/`)
+
+## Cloning Programs
+
+To create similar programs efficiently:
+
+1. Create one program fully configured
+2. Use it as a template for subsequent programs
+3. Only update dates, names, and program-specific settings
+4. Verify module settings are still appropriate
+
+This ensures consistency across program instances.
+
+## Troubleshooting
+
+<Accordion title="Teachers can't create classes">
+Verify:
+- Timeslots have been created in the Resource Module
+- Teacher registration deadlines are open
+- TeacherClassRegModule is enabled
+</Accordion>
+
+<Accordion title="Students can't see the catalog">
+Check:
+- Classes have been approved (status = accepted)
+- Classes have been scheduled to timeslots
+- Student registration deadline is open
+- StudentClassRegModule is enabled
+</Accordion>
+
+<Accordion title="Dashboard shows no statistics">
+Ensure:
+- AdminVitals module is enabled
+- JSONDataModule is enabled
+- Users have actually registered
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Program Modules" href="./program-modules">
+    Learn about each module and how to configure them
+  </Card>
+  <Card title="Customize Theme" href="./themes">
+    Set up your program's appearance and navigation
+  </Card>
+</CardGroup>

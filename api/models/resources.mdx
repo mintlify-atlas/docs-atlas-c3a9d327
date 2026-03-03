@@ -1,0 +1,568 @@
+---
+title: Resources Models
+description: Models for managing classrooms, equipment, and resource assignments
+---
+
+## Overview
+
+The ESP resources system manages physical resources needed for programs:
+- **ResourceType**: Categories of resources (Classroom, Projector, etc.)
+- **Resource**: Individual resources (specific classrooms, equipment)
+- **ResourceRequest**: Requests for resources by classes
+- **ResourceAssignment**: Assignment of resources to class sections
+
+**Source:** `esp/esp/resources/models.py`
+
+## ResourceType Model
+
+Defines types/categories of resources available.
+
+**Line:** `esp/esp/resources/models.py:69`
+
+### Fields
+
+<ParamField path="name" type="CharField" required>
+  Brief name of resource type
+  - Max length: 40 characters
+  - Examples: "Classroom", "Projector", "Computer[s]"
+</ParamField>
+
+<ParamField path="description" type="TextField" required>
+  Detailed description of resource type
+  - What is this resource?
+</ParamField>
+
+<ParamField path="consumable" type="BooleanField">
+  Whether resource is consumable/single-use
+  - Default: False
+  - Not fully implemented yet
+</ParamField>
+
+<ParamField path="priority_default" type="IntegerField">
+  Default priority/importance level
+  - Default: -1
+  - Higher numbers = more important
+</ParamField>
+
+<ParamField path="only_one" type="BooleanField">
+  Whether to limit to one instance in some contexts
+  - Default: False
+</ParamField>
+
+<ParamField path="attributes_dumped" type="TextField">
+  Pipe-delimited list of possible attribute values
+  - Example: "LCD projector|Overhead projector|Amplified speaker"
+  - Default: "Don't care"
+</ParamField>
+
+<ParamField path="program" type="ForeignKey">
+  Program this resource type is specific to
+  - Links to: `Program`
+  - Null = global resource type available to all programs
+</ParamField>
+
+<ParamField path="autocreated" type="BooleanField">
+  Whether type was automatically created
+  - Default: False
+</ParamField>
+
+<ParamField path="hidden" type="BooleanField">
+  Whether to hide from class creation forms
+  - Default: False
+</ParamField>
+
+### Methods
+
+<ResponseField name="get_or_create(label, program=None)" type="ResourceType">
+  Gets existing type or creates new one
+  
+  **Parameters:**
+  - `label` (string): Name of resource type
+  - `program` (Program): Program for type, or None for global
+  
+  **Returns:** ResourceType instance
+  
+  **Example:**
+  ```python
+  from esp.resources.models import ResourceType
+  
+  classroom_type = ResourceType.get_or_create('Classroom')
+  projector_type = ResourceType.get_or_create('Projector', program)
+  ```
+</ResponseField>
+
+## Resource Model
+
+Individual resource instances (specific classrooms, equipment pieces).
+
+**Line:** `esp/esp/resources/models.py:161`
+
+### Fields
+
+<ParamField path="name" type="CharField" required>
+  Name/identifier of the resource
+  - Max length: 80 characters
+  - Examples: "Room 4-237", "Projector A"
+</ParamField>
+
+<ParamField path="res_type" type="ForeignKey" required>
+  Type category of this resource
+  - Links to: `ResourceType`
+  - Cannot be null
+</ParamField>
+
+<ParamField path="num_students" type="IntegerField">
+  Capacity (for classrooms)
+  - Default: -1 (not applicable)
+  - For classrooms: maximum number of students
+</ParamField>
+
+<ParamField path="res_group" type="ForeignKey">
+  Group of related resources
+  - Links to: `ResourceGroup`
+  - Resources in same group are bundled together
+  - Auto-created on save if not set
+</ParamField>
+
+<ParamField path="is_unique" type="BooleanField">
+  Whether resource is in its own group
+  - Default: False
+  - Set to True if res_group is auto-created
+</ParamField>
+
+<ParamField path="user" type="ForeignKey">
+  User associated with resource (for teacher availability)
+  - Links to: `ESPUser`
+  - Null for physical resources
+</ParamField>
+
+<ParamField path="event" type="ForeignKey" required>
+  Time block when resource is available
+  - Links to: `Event`
+  - Same resource at different times = separate Resource objects
+</ParamField>
+
+<ParamField path="attribute_value" type="TextField">
+  Specific attribute value for this resource
+  - Corresponds to ResourceType.attributes_dumped options
+  - Example: "LCD projector" for A/V type
+</ParamField>
+
+### Key Methods
+
+<ResponseField name="is_available(timeslot=None)" type="bool">
+  Checks if resource is available (not assigned)
+  
+  **Parameters:**
+  - `timeslot` (Event): Check specific time, or use resource's event if None
+  
+  **Returns:** True if not assigned to any class
+  
+  **Cached:** Yes
+  
+  **Example:**
+  ```python
+  from esp.resources.models import Resource
+  
+  room = Resource.objects.get(name='Room 4-237', event=timeslot)
+  if room.is_available():
+      print("Room is free")
+  ```
+</ResponseField>
+
+<ResponseField name="is_taken()" type="bool">
+  Checks if resource is currently assigned
+  
+  **Returns:** True if ResourceAssignment exists for this resource
+</ResponseField>
+
+<ResponseField name="identical_resources(prog=None)" type="QuerySet">
+  Returns all Resources with same name
+  
+  **Parameters:**
+  - `prog` (Program): Filter by program
+  
+  **Returns:** QuerySet of Resource objects
+  
+  **Use case:** Same classroom at different times
+  
+  **Example:**
+  ```python
+  room = Resource.objects.get(name='Room 4-237', event=timeslot1)
+  all_times = room.identical_resources(program)
+  # Returns Room 4-237 at all time blocks
+  ```
+</ResponseField>
+
+<ResponseField name="available_times(program=None)" type="list">
+  Returns time blocks when resource is available
+  
+  **Parameters:**
+  - `program` (Program): Filter by program
+  
+  **Returns:** List of Event objects
+  
+  **Example:**
+  ```python
+  room = Resource.objects.get(name='Room 4-237', event__program=program)
+  free_times = room.available_times(program)
+  print(f"Room free for {len(free_times)} time blocks")
+  ```
+</ResponseField>
+
+<ResponseField name="assign_to_section(section, override=False)" type="ResourceAssignment">
+  Assigns resource to a class section
+  
+  **Parameters:**
+  - `section` (ClassSection): Section to assign to
+  - `override` (bool): Clear existing assignments
+  
+  **Returns:** ResourceAssignment object
+  
+  **Raises:** ESPError if resource already taken and override=False
+  
+  **Example:**
+  ```python
+  room = Resource.objects.get(name='Room 4-237', event=timeslot)
+  section = ClassSection.objects.get(id=123)
+  
+  try:
+      assignment = room.assign_to_section(section)
+      print(f"Assigned {room.name} to {section.emailcode()}")
+  except ESPError as e:
+      print(f"Assignment failed: {e}")
+  ```
+</ResponseField>
+
+<ResponseField name="clear_assignments()">
+  Removes all assignments of this resource
+  
+  **Example:**
+  ```python
+  room.clear_assignments()
+  ```
+</ResponseField>
+
+<ResponseField name="satisfies_requests(req_class)" type="tuple">
+  Checks if resource satisfies class's resource requests
+  
+  **Parameters:**
+  - `req_class` (ClassSection): Section with resource requests
+  
+  **Returns:** Tuple of (bool: all_satisfied, QuerySet: unsatisfied_requests)
+  
+  **Example:**
+  ```python
+  room = Resource.objects.get(name='Room 4-237', event=timeslot)
+  section = ClassSection.objects.get(id=123)
+  
+  satisfied, missing = room.satisfies_requests(section)
+  if not satisfied:
+      print("Missing resources:")
+      for req in missing:
+          print(f"  - {req.res_type.name}")
+  ```
+</ResponseField>
+
+## ResourceRequest Model
+
+Request for a specific type of resource by a class.
+
+**Line:** `esp/esp/resources/models.py:144`
+
+### Fields
+
+<ParamField path="target" type="ForeignKey">
+  Class section requesting resource
+  - Links to: `ClassSection`
+  - Null if request is for ClassSubject
+</ParamField>
+
+<ParamField path="target_subj" type="ForeignKey">
+  Class subject requesting resource
+  - Links to: `ClassSubject`
+  - Null if request is for ClassSection
+</ParamField>
+
+<ParamField path="res_type" type="ForeignKey" required>
+  Type of resource being requested
+  - Links to: `ResourceType`
+</ParamField>
+
+<ParamField path="desired_value" type="TextField" required>
+  Specific attribute value desired
+  - Corresponds to ResourceType attributes
+  - Example: "LCD projector" for A/V type
+</ParamField>
+
+### Example
+
+```python
+from esp.resources.models import ResourceRequest, ResourceType
+from esp.program.models.class_ import ClassSection
+
+section = ClassSection.objects.get(id=123)
+projector_type = ResourceType.get_or_create('A/V')
+
+# Request a projector
+request = ResourceRequest.objects.create(
+    target=section,
+    res_type=projector_type,
+    desired_value='LCD projector'
+)
+```
+
+## ResourceAssignment Model
+
+Binding of a resource to a class section.
+
+**Line:** `esp/esp/resources/models.py:352`
+
+### Fields
+
+<ParamField path="resource" type="ForeignKey" required>
+  Resource being assigned
+  - Links to: `Resource`
+  - Points to entire resource group
+</ParamField>
+
+<ParamField path="target" type="ForeignKey">
+  Class section receiving assignment
+  - Links to: `ClassSection`
+  - Null if assigned to ClassSubject
+</ParamField>
+
+<ParamField path="target_subj" type="ForeignKey">
+  Class subject receiving assignment
+  - Links to: `ClassSubject`
+  - Null if assigned to ClassSection
+</ParamField>
+
+<ParamField path="lock_level" type="IntegerField">
+  Lock level for automatic scheduling
+  - Default: 0 (unlocked)
+  - Higher values = more resistant to changes
+</ParamField>
+
+<ParamField path="returned" type="BooleanField">
+  Whether floating resource has been returned
+  - Default: False
+  - Only relevant for non-classroom resources
+</ParamField>
+
+<ParamField path="assignment_group" type="ForeignKey">
+  Group of related assignments
+  - Links to: `AssignmentGroup`
+  - Auto-created on save
+</ParamField>
+
+### Methods
+
+<ResponseField name="resources()" type="QuerySet">
+  Returns all resources in same group as assigned resource
+  
+  **Returns:** QuerySet of Resource objects
+</ResponseField>
+
+<ResponseField name="getTargetOrSubject()" type="ClassSection or ClassSubject">
+  Returns most specific target
+  
+  **Returns:** target if set, otherwise target_subj
+</ResponseField>
+
+## Usage Examples
+
+### Setting Up Classrooms for a Program
+
+```python
+from esp.resources.models import ResourceType, Resource
+from esp.program.models import Program
+from esp.cal.models import Event
+
+program = Program.objects.get(url='Splash/2024')
+classroom_type = ResourceType.get_or_create('Classroom')
+
+# Get all timeslots for the program
+timeslots = Event.objects.filter(program=program)
+
+# Create classroom resources for each timeslot
+rooms = [
+    {'name': 'Room 4-237', 'capacity': 30},
+    {'name': 'Room 4-245', 'capacity': 25},
+    {'name': 'Room 4-257', 'capacity': 40},
+]
+
+for room_info in rooms:
+    for timeslot in timeslots:
+        Resource.objects.create(
+            name=room_info['name'],
+            res_type=classroom_type,
+            num_students=room_info['capacity'],
+            event=timeslot
+        )
+
+print(f"Created {len(rooms) * timeslots.count()} classroom resources")
+```
+
+### Requesting Resources for a Class
+
+```python
+from esp.resources.models import ResourceRequest, ResourceType
+from esp.program.models.class_ import ClassSection
+
+section = ClassSection.objects.get(id=123)
+
+# Request a projector
+av_type = ResourceType.get_or_create('A/V')
+ResourceRequest.objects.create(
+    target=section,
+    res_type=av_type,
+    desired_value='LCD projector'
+)
+
+# Request computers
+computer_type = ResourceType.get_or_create('Computer[s]')
+ResourceRequest.objects.create(
+    target=section,
+    res_type=computer_type,
+    desired_value='Macs for students'
+)
+
+print(f"Added resource requests for {section.emailcode()}")
+```
+
+### Finding Available Classrooms
+
+```python
+from esp.resources.models import Resource, ResourceType
+from esp.cal.models import Event
+
+program = Program.objects.get(url='Splash/2024')
+timeslot = Event.objects.get(id=456)
+classroom_type = ResourceType.get_or_create('Classroom')
+
+# Get all classrooms at this timeslot
+all_rooms = Resource.objects.filter(
+    event=timeslot,
+    res_type=classroom_type
+)
+
+# Filter to available ones
+available_rooms = [r for r in all_rooms if r.is_available()]
+
+print(f"Available rooms at {timeslot.start}:")
+for room in available_rooms:
+    print(f"  {room.name} (capacity: {room.num_students})")
+```
+
+### Assigning Resources to a Class
+
+```python
+from esp.resources.models import Resource
+from esp.program.models.class_ import ClassSection
+
+section = ClassSection.objects.get(id=123)
+
+# Find a suitable classroom
+required_capacity = section.parent_class.class_size_max
+timeslots = section.meeting_times.all()
+
+for timeslot in timeslots:
+    # Find available classroom with enough capacity
+    suitable_rooms = Resource.objects.filter(
+        event=timeslot,
+        res_type__name='Classroom',
+        num_students__gte=required_capacity
+    )
+    
+    for room in suitable_rooms:
+        if room.is_available():
+            try:
+                room.assign_to_section(section)
+                print(f"Assigned {room.name} for {timeslot.start}")
+                break
+            except ESPError:
+                continue
+```
+
+### Checking Resource Fulfillment
+
+```python
+section = ClassSection.objects.get(id=123)
+
+# Get assigned classroom
+rooms = section.classrooms()
+if rooms.exists():
+    room = rooms.first()
+    
+    # Check if room satisfies all requests
+    satisfied, missing = room.satisfies_requests(section)
+    
+    if satisfied:
+        print(f"All resource requests fulfilled")
+    else:
+        print(f"Missing resources:")
+        for req in missing:
+            print(f"  - {req.res_type.name}: {req.desired_value}")
+else:
+    print("No classroom assigned")
+```
+
+### Clearing and Reassigning Resources
+
+```python
+section = ClassSection.objects.get(id=123)
+
+# Clear all room assignments
+section.clearRooms()
+
+# Clear floating resources (projectors, etc.)
+section.clearFloatingResources()
+
+# Reassign to different room
+new_room = Resource.objects.get(name='Room 4-245', event=timeslot)
+success, errors = section.assign_room(new_room, clear_others=True)
+
+if success:
+    print("Successfully reassigned classroom")
+else:
+    for error in errors:
+        print(f"Error: {error}")
+```
+
+### Resource Usage Report
+
+```python
+from esp.resources.models import Resource
+from esp.program.models import Program
+
+program = Program.objects.get(url='Splash/2024')
+classroom_type = ResourceType.get_or_create('Classroom')
+
+# Get all unique classroom names
+room_names = Resource.objects.filter(
+    event__program=program,
+    res_type=classroom_type
+).values_list('name', flat=True).distinct()
+
+print("Classroom utilization:")
+for room_name in room_names:
+    room_resources = Resource.objects.filter(
+        name=room_name,
+        event__program=program
+    )
+    
+    total_slots = room_resources.count()
+    used_slots = sum(1 for r in room_resources if r.is_taken())
+    
+    utilization = (used_slots / total_slots * 100) if total_slots > 0 else 0
+    print(f"  {room_name}: {used_slots}/{total_slots} ({utilization:.1f}%)")
+```
+
+## Related Models
+
+- [ClassSection](/api/models/class) - Sections that use resources
+- [Program](/api/models/program) - Programs that define resource availability
+- `Event` - Time blocks for resource availability
+- `ResourceGroup` - Groups related resources
+- `AssignmentGroup` - Groups related assignments

@@ -1,0 +1,489 @@
+---
+title: Onsite Modules
+description: Program modules for day-of-program operations and onsite registration
+---
+
+## Overview
+
+Onsite modules (`module_type="onsite"`) provide tools for managing the program on the day it takes place. These modules handle check-in, class changes, attendance tracking, and other real-time operational needs. They appear in the onsite interface at `/onsite/<program>/` and require onsite staff permissions.
+
+## Core Module
+
+### OnsiteCore
+
+**File**: `esp/esp/program/modules/handlers/onsitecore.py`
+
+**Purpose**: Serves the main onsite landing page with links to all onsite tools.
+
+**Module Properties**:
+- Admin Title: "Onsite Reg Core Module"
+- Link Title: "onsite"
+- Module Type: "onsite"
+- Seq: -1000 (displayed first)
+- Choosable: Yes
+
+**Key Features**:
+- Central hub for all onsite operations
+- Quick access to all enabled onsite modules
+- Different interface for admin vs. onsite-only staff
+- Links to most-used onsite tools
+
+**Main Views**:
+- `main` - Main onsite landing page
+
+## Check-in Modules
+
+### OnSiteCheckinModule
+
+**File**: `esp/esp/program/modules/handlers/onsitecheckinmodule.py`
+
+**Purpose**: Check in students when they arrive, verify payments and forms.
+
+**Module Properties**:
+- Admin Title: "On-Site User Check-In"
+- Link Title: "Check-in (check students off for payments and forms)"
+- Module Type: "onsite"
+- Seq: 1
+- Choosable: Yes
+
+**Key Features**:
+- Barcode scanning for rapid check-in
+- Manual student search and lookup
+- Payment verification and marking
+- Medical/liability form verification
+- Attendance recording
+- Student information display
+- Schedule viewing
+- Onsite profile editing
+
+**Main Views**:
+- `checkin` - Main check-in interface
+- `barcode_checkin` - Barcode-based check-in
+- `student_status` - View individual student status
+- `mark_paid` - Mark student as paid
+- `mark_attended` - Mark student as checked in
+
+**Check-in Process**:
+1. Scan barcode or search for student
+2. View student information and schedule
+3. Verify payment status
+4. Verify medical/liability forms
+5. Mark as checked in (attended)
+6. Print materials if needed
+
+**Records Created**:
+- `attended`: Student has checked in
+- `paid`: Payment received
+- `Med`: Medical form submitted
+- `Liab`: Liability form submitted
+
+### OnSiteCheckoutModule
+
+**File**: `esp/esp/program/modules/handlers/onsitecheckoutmodule.py`
+
+**Purpose**: Check out students when they leave the program.
+
+**Module Properties**:
+- Admin Title: "On-Site User Check-Out"
+- Link Title: "Check-out"
+- Module Type: "onsite"
+- Seq: 2
+- Choosable: Yes
+
+**Features**:
+- Mark students as checked out
+- Verify student departure
+- Track who is still on premises
+
+### TeacherCheckinModule
+
+**File**: `esp/esp/program/modules/handlers/teachercheckinmodule.py`
+
+**Purpose**: Check in teachers when they arrive to teach.
+
+**Module Properties**:
+- Admin Title: "Teacher Check-In"
+- Link Title: "Check in teachers"
+- Module Type: "onsite"
+- Seq: 10
+- Choosable: Yes
+
+**Key Features**:
+- Barcode or manual check-in
+- View teacher's schedule
+- See which classes they're teaching
+- Mark teachers as present
+- Room assignment information
+
+**Main Views**:
+- `teachercheckin` - Main teacher check-in interface
+- `barcode_checkin` - Barcode-based teacher check-in
+
+## Registration and Class Management
+
+### OnSiteRegister
+
+**File**: `esp/esp/program/modules/handlers/onsiteregister.py`
+
+**Purpose**: Register new students on-site who haven't pre-registered.
+
+**Module Properties**:
+- Admin Title: "Onsite New Registration"
+- Link Title: "New Student Registration"
+- Module Type: "onsite"
+- Seq: 30
+- Choosable: Yes
+
+**Key Features**:
+- Create new student accounts on-site
+- Minimal information required:
+  - First and last name
+  - Email
+  - Grade
+  - School
+  - Payment status
+  - Medical/liability status
+- Automatically mark as attended and checked in
+- Generate temporary password
+- Redirect to class selection
+
+**Main Views**:
+- `onsite_create` - Registration form for new students
+
+**Process**:
+1. Student arrives without pre-registration
+2. Staff enters basic information
+3. System creates account
+4. Student can immediately select classes
+5. Password reset email sent
+
+### OnSiteClassList
+
+**File**: `esp/esp/program/modules/handlers/onsiteclasslist.py`
+
+**Purpose**: Display lists of open classes for onsite registration.
+
+**Module Properties**:
+- Admin Title: "Show Open Classes at Onsite Registration"
+- Link Title: "List of Open Classes"
+- Module Type: "onsite"
+- Seq: 32
+- Choosable: Yes
+
+**Key Features**:
+- View all classes with open spots
+- Filter by time, category, grade
+- See current enrollment vs. capacity
+- Real-time updates
+- Print class lists
+
+**Main Views**:
+- `classlist` - Main class list view
+- `classlist_by_time` - Classes organized by timeslot
+
+**Display Information**:
+- Class title and code
+- Teacher name
+- Time and room
+- Current enrollment
+- Available spots
+- Grade range
+
+### OnsiteClassSchedule
+
+**File**: `esp/esp/program/modules/handlers/onsiteclassschedule.py`
+
+**Purpose**: Display the full class schedule in various formats.
+
+**Module Properties**:
+- Admin Title: "Onsite Class Schedule Display"
+- Link Title: "Class Schedule"
+- Module Type: "onsite"
+- Seq: 20
+- Choosable: Yes
+
+**Features**:
+- Grid view of all classes by time
+- Filter by category, room, teacher
+- Printable format
+- Large display mode for posting
+
+## Attendance and Tracking
+
+### OnSiteAttendance
+
+**File**: `esp/esp/program/modules/handlers/onsiteattendance.py`
+
+**Purpose**: Take and track class attendance during the program.
+
+**Module Properties**:
+- Admin Title: "On-Site Student Attendance"
+- Link Title: "Check Student Attendance"
+- Module Type: "onsite"
+- Seq: 1
+- Choosable: Yes
+
+**Key Features**:
+- Mark attendance for individual classes
+- View attendance reports
+- Track no-shows
+- Statistics on class attendance
+- Export attendance data
+
+**Main Views**:
+- `attendance` - Main attendance interface
+- `class_attendance` - Attendance for a specific class
+- `attendance_reports` - Summary reports
+
+**Use Cases**:
+- Teachers mark attendance at start of class
+- Track which students attended which classes
+- Identify students not attending registered classes
+- Generate attendance certificates
+
+## Payment Modules
+
+### OnsitePaidItemsModule
+
+**File**: `esp/esp/program/modules/handlers/onsitepaiditemsmodule.py`
+
+**Purpose**: Manage onsite purchases and payments.
+
+**Module Properties**:
+- Admin Title: "Onsite Paid Items"
+- Link Title: "Sell Items"
+- Module Type: "onsite"
+- Seq: 15
+- Choosable: Yes
+
+**Features**:
+- Record onsite purchases (t-shirts, meals, etc.)
+- Accept payments
+- Update student accounts
+- Print receipts
+
+## Printing Modules
+
+### OnsitePrintSchedules
+
+**File**: `esp/esp/program/modules/handlers/onsiteprintschedules.py`
+
+**Purpose**: Quick printing of student schedules on-site.
+
+**Module Properties**:
+- Admin Title: "Onsite Schedule Printing"
+- Link Title: "Print Schedules"
+- Module Type: "onsite"
+- Seq: 25
+- Choosable: Yes
+
+**Features**:
+- Search for student
+- Print their schedule immediately
+- Batch printing for multiple students
+- Various schedule formats
+
+## Display and Information
+
+### BigBoardModule
+
+**File**: `esp/esp/program/modules/handlers/bigboardmodule.py` (can be used for onsite)
+
+**Purpose**: Large display for current and upcoming classes.
+
+**Features**:
+- Current classes in progress
+- Next timeslot preview
+- Room assignments
+- Auto-refresh for projector display
+
+## Admin-Accessible Onsite Tools
+
+Many admin modules are also useful during onsite operations:
+
+### From Admin Modules:
+
+- **CommModule**: Send announcements to participants
+- **AdminClass**: Make class changes on the fly
+- **ResourceModule**: Reassign rooms
+- **AJAXSchedulingModule**: Fix scheduling conflicts
+- **ProgramPrintables**: Print rosters, schedules, etc.
+
+## Student/Teacher Onsite Modules
+
+Some modules in the student/teacher categories support onsite use:
+
+### StudentOnsite
+
+**File**: `esp/esp/program/modules/handlers/studentonsite.py`
+
+**Module Type**: "learn"
+
+**Purpose**: Student-facing onsite information and schedule viewing.
+
+### TeacherOnsite
+
+**File**: `esp/esp/program/modules/handlers/teacheronsite.py`
+
+**Module Type**: "teach"
+
+**Purpose**: Teacher-facing onsite information and roster viewing.
+
+## Common Onsite Workflows
+
+### Student Arrival Workflow
+
+1. **Check-in** (OnSiteCheckinModule):
+   - Scan barcode or search by name
+   - Verify identity
+   - Check payment status
+   - Verify forms
+   - Mark as attended
+
+2. **Class Selection** (if needed):
+   - View open classes (OnSiteClassList)
+   - Help student add classes
+   - Print schedule (OnsitePrintSchedules)
+
+3. **Ongoing**:
+   - Take attendance in classes (OnSiteAttendance)
+   - Handle schedule changes
+   - Track student location
+
+### Walk-in Student Workflow
+
+1. **Registration** (OnSiteRegister):
+   - Create new account
+   - Collect payment
+   - Verify forms
+
+2. **Class Selection**:
+   - View open classes
+   - Register for classes
+   - Print schedule
+
+3. **Automatic Check-in**:
+   - Already marked as attended during registration
+
+### Teacher Arrival Workflow
+
+1. **Check-in** (TeacherCheckinModule):
+   - Verify identity
+   - Show schedule and room assignments
+   - Mark as present
+
+2. **Support**:
+   - Answer questions about schedule
+   - Provide room keys/materials
+   - Handle last-minute changes
+
+## Development Notes
+
+### Creating a Custom Onsite Module
+
+```python
+from esp.program.modules.base import ProgramModuleObj, needs_onsite, main_call
+from esp.utils.web import render_to_response
+
+class MyOnsiteModule(ProgramModuleObj):
+    doc = """Description of onsite functionality."""
+    
+    @classmethod
+    def module_properties(cls):
+        return {
+            "admin_title": "My Onsite Tool",
+            "link_title": "My Tool",
+            "module_type": "onsite",
+            "seq": 50,
+            "choosable": 1,
+        }
+    
+    @main_call
+    @needs_onsite
+    def mytool(self, request, tl, one, two, module, extra, prog):
+        context = {'program': prog}
+        return render_to_response(self.baseDir() + 'main.html', request, context)
+```
+
+### Onsite Module Best Practices
+
+1. **Speed is Critical**: Onsite tools must be fast and responsive
+2. **Minimize Clicks**: Design for efficiency with many users
+3. **Clear Feedback**: Provide immediate visual/audio confirmation
+4. **Error Handling**: Gracefully handle barcode scanning errors
+5. **Offline Capability**: Consider what happens if internet is slow
+6. **Print-Friendly**: Many onsite outputs need to be printable
+7. **Large Touch Targets**: May be used on tablets/touchscreens
+8. **Barcode Support**: Implement barcode scanning where possible
+
+### Permission Decorators for Onsite
+
+```python
+@needs_onsite  # Requires onsite staff or admin
+@needs_onsite_no_switchback  # Stricter onsite requirement
+```
+
+### Common Onsite Patterns
+
+#### Student Lookup
+
+```python
+from esp.users.views import search_for_user
+
+user, found = search_for_user(request, 
+    ESPUser.objects.filter(program_students=prog))
+if not found:
+    return user  # Returns the search form
+# Use user object
+```
+
+#### Barcode Scanning
+
+```python
+def barcode_checkin(self, request, tl, one, two, module, extra, prog):
+    if request.method == 'POST':
+        barcode = request.POST.get('barcode')
+        try:
+            user = ESPUser.objects.get(id=barcode)
+            # Process check-in
+        except ESPUser.DoesNotExist:
+            # Handle error
+```
+
+#### Record Management
+
+```python
+from esp.users.models import Record, RecordType
+
+# Create a record
+rt = RecordType.objects.get(name="attended")
+rec = Record.objects.create(
+    user=student,
+    event=rt,
+    program=prog
+)
+
+# Check if record exists
+has_attended = Record.objects.filter(
+    user=student,
+    event__name="attended",
+    program=prog
+).exists()
+```
+
+## Hardware Recommendations
+
+For optimal onsite operations:
+
+1. **Barcode Scanners**: USB or Bluetooth scanners for check-in
+2. **Tablets**: For mobile check-in stations
+3. **Receipt Printers**: For printing schedules and receipts
+4. **Large Displays**: For class schedules and announcements
+5. **Backup Internet**: Mobile hotspot in case of WiFi issues
+
+## See Also
+
+- [Program Modules Overview](/api/modules/overview)
+- [Student Modules](/api/modules/student)
+- [Teacher Modules](/api/modules/teacher)
+- [Admin Modules](/api/modules/admin)

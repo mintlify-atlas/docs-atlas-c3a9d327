@@ -1,0 +1,213 @@
+---
+title: Student Registration
+description: Guide students through the complete registration process for an ESP program
+---
+
+Student registration is the core workflow that allows students to sign up for and participate in ESP programs like MIT Splash. This process guides students through profile setup, class selection, payment, and confirmation.
+
+## Registration Overview
+
+The student registration system uses a modular approach where students complete various required and optional steps before confirming their registration. The main registration page displays their progress and provides access to all enabled modules.
+
+## Registration Workflow
+
+<Steps>
+  <Step title="Access the Registration Page">
+    Students navigate to `/learn/[program]/[instance]/studentreg` to begin registration.
+    
+    The main page displays:
+    - Progress indicators (checkboxes or progress bar based on configuration)
+    - Links to required and optional modules
+    - Registration status and deadlines
+    - Available actions (Confirm, Cancel, View Schedule)
+  </Step>
+
+  <Step title="Complete Student Profile">
+    If the Student Profile Editor module is enabled, students must fill out their profile information:
+    
+    - Personal information (name, email, phone)
+    - Parent/guardian contact information
+    - Emergency contact details
+    - School information
+    - Grade level and graduation year
+    - Optional fields: medical needs, T-shirt size, dietary restrictions
+    
+    Students who have filled out a profile within the last 5 days can skip this step as their previous profile is automatically duplicated.
+  </Step>
+
+  <Step title="Submit Required Forms">
+    Depending on program configuration, students may need to complete:
+    
+    **Acknowledgement Forms**
+    - Code of conduct agreement
+    - Program rules and policies
+    
+    **Medical/Liability Forms**
+    - May use Formstack integration for secure form submission
+    - Postback confirmation to mark completion
+    
+    **Custom Forms**
+    - Any additional information required by the program
+    - Custom questions configured by administrators
+  </Step>
+
+  <Step title="Apply for Financial Aid (Optional)">
+    Students can request financial aid if they need assistance:
+    
+    - Fill out the financial aid application form
+    - Students receiving free/reduced lunch are automatically granted aid
+    - Applications are reviewed by program administrators
+    - Grants can be specified as dollar amounts or percentages
+  </Step>
+
+  <Step title="Select Classes">
+    This is the core of student registration. The process varies by registration type:
+    
+    **Standard Registration (First-Come First-Served)**
+    - Browse the class catalog at `/learn/[program]/[instance]/catalog`
+    - View class descriptions, times, locations, and availability
+    - Add classes to their schedule
+    - Classes are confirmed immediately based on availability
+    - Subject to class capacity limits (unless "Enforce max" is disabled)
+    
+    **Priority Registration**
+    - Select multiple classes per timeslot
+    - Rank preferences (1st choice, 2nd choice, etc.)
+    - Administrators assign students after registration closes
+    
+    **Lottery Registration**
+    - Select classes of interest during the lottery period
+    - Run the lottery assignment script to assign students
+    - Switch to standard registration afterward
+    
+    **Two-Phase Registration**
+    - Phase 1: Star classes of interest in an interactive catalog
+    - Phase 2: Rank priorities for each timeslot
+    - More modern interface with search and filtering
+  </Step>
+
+  <Step title="Select Optional Items">
+    If enabled, students can purchase optional items:
+    
+    - Meals (breakfast, lunch, dinner)
+    - T-shirts
+    - Custom program items
+    - Sibling discounts (if applicable)
+    
+    Line items appear on their invoice and can be required or optional based on configuration.
+  </Step>
+
+  <Step title="Select Lunch Period (If Required)">
+    For programs with lunch constraints:
+    
+    - Students with both morning and afternoon classes must select a lunch period
+    - Ensures proper scheduling and prevents conflicts
+    - Can be removed later if schedule changes make it unnecessary
+  </Step>
+
+  <Step title="Make Payment">
+    Students review their itemized costs:
+    
+    - Program admission fee
+    - Optional items selected
+    - Financial aid applied (if granted)
+    - Total balance due
+    
+    Payment options may include:
+    - Credit card (via Stripe or Cybersource)
+    - Check or cash
+    - Full or partial payment
+    - Donation to Learning Unlimited (optional)
+  </Step>
+
+  <Step title="Confirm Registration">
+    Once all required modules are completed:
+    
+    - Click the "Confirm Registration" button
+    - A record is created marking the student as confirmed
+    - Confirmation email is sent with schedule and details
+    - Receipt page displays with program information
+    
+    The confirmation button only appears when:
+    - All required modules are completed
+    - The registration deadline has not passed
+    - The program has not reached capacity
+  </Step>
+</Steps>
+
+## After Confirmation
+
+Once confirmed, students can:
+
+- View and print their schedule
+- Make changes to their class selections (if the deadline is open)
+- View teacher biographies
+- Access program materials and resources
+- Print confirmation receipt
+
+## Canceling Registration
+
+Students can cancel their registration if needed:
+
+- Click the "Cancel Registration" button on the main page
+- Confirmation record is deleted
+- Optionally removed from all registered classes (if configured)
+- Cannot cancel if credit card payment has been processed
+
+## Waitlist Process
+
+If a program is full, students may join a waitlist:
+
+1. Access `/learn/[program]/[instance]/waitlist_subscribe`
+2. Submit to be added to the waitlist
+3. Receive notification if space becomes available
+4. Complete registration when capacity opens
+
+## Registration Types
+
+The system supports different registration types (verbs):
+
+- **Enrolled**: Student is registered for the class (default)
+- **Applied**: Student has applied; teacher approval required
+- **Priority/Interested**: For lottery and priority systems
+- **Waitlisted**: On the waitlist for a full class
+
+## Student Representatives
+
+Programs can allow students to apply to be student representatives:
+
+- Application form included in student profile
+- Special designation in the system
+- May have additional responsibilities or privileges
+
+## Mobile-Friendly Onsite Features
+
+The Student Onsite Webapp provides mobile access during the program:
+
+- View live schedule at `/learn/[program]/[instance]/studentonsite`
+- Get directions to classrooms with integrated maps
+- Make class changes onsite
+- Fill out surveys
+- Optimized for smartphone use
+
+## Deadlines and Permissions
+
+Various aspects of registration are controlled by deadlines:
+
+- `/MainPage`: Access to the main registration page
+- `/Confirm`: Ability to confirm registration
+- `/Cancel`: Ability to cancel registration
+- `Student/Classes`: When class registration closes
+- Individual module deadlines (profile, forms, etc.)
+
+Deadlines can be set per-student or globally and control when features are available.
+
+## Tips for a Smooth Registration
+
+- Complete your profile early to save time later
+- Apply for financial aid before registration opens if needed
+- Browse the catalog before registration starts to identify classes of interest
+- Have payment information ready
+- Confirm your registration promptly to secure your spot
+- Check your email for confirmation and updates
+- Print or save your schedule for reference during the program

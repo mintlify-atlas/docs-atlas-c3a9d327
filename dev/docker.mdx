@@ -1,0 +1,251 @@
+---
+title: Docker Commands
+description: Common Docker commands and workflows for ESP Website development
+---
+
+This guide covers common Docker commands and workflows for developing the ESP Website.
+
+## Container Management
+
+### Starting and Stopping
+
+<CodeGroup>
+  ```bash Start containers
+  docker compose up
+  ```
+
+  ```bash Stop containers
+  docker compose down
+  ```
+
+  ```bash Rebuild and start
+  docker compose up --build
+  ```
+</CodeGroup>
+
+<Warning>
+  Always run `docker compose down` before `docker compose up --build` to avoid build errors caused by symlinks in the mounted volume.
+</Warning>
+
+### Clean Restart
+
+To stop and delete the database (fresh start):
+
+```bash
+docker compose down -v
+```
+
+<Warning>
+  The `-v` flag removes all data volumes, including the database. This cannot be undone.
+</Warning>
+
+## Common Commands
+
+### Django Management Commands
+
+Run any `manage.py` command using:
+
+```bash
+docker compose exec web python esp/manage.py <command>
+```
+
+### Examples
+
+<CodeGroup>
+  ```bash Open Django shell
+  docker compose exec web python esp/manage.py shell_plus
+  ```
+
+  ```bash Run migrations
+  docker compose exec web python esp/manage.py migrate
+  ```
+
+  ```bash Run tests
+  docker compose exec web python esp/manage.py test
+  ```
+
+  ```bash Create superuser
+  docker compose exec web python esp/manage.py createsuperuser
+  ```
+</CodeGroup>
+
+### Shell Access
+
+<CodeGroup>
+  ```bash Bash shell in web container
+  docker compose exec web bash
+  ```
+
+  ```bash PostgreSQL database
+  docker compose exec db psql -U esp devsite_django
+  ```
+</CodeGroup>
+
+## Loading a Database Dump
+
+If you have an existing database dump (e.g., from a previous development setup), you can load it into the Docker environment.
+
+<Steps>
+  <Step title="Start with a clean database">
+    Remove the existing volume and bring the containers back up:
+
+    ```bash
+    docker compose down -v
+    docker compose up
+    ```
+
+    Wait a few seconds for PostgreSQL to initialize, then proceed.
+  </Step>
+
+  <Step title="Copy the dump into the container">
+    <CodeGroup>
+      ```bash Linux/macOS/WSL
+      docker cp /path/to/dump.sql $(docker compose ps -q db):/tmp/dump.sql
+      ```
+
+      ```powershell Windows PowerShell
+      # First, get the container ID
+      docker compose ps -q db
+      # Then copy, replacing <container-id> with the output above
+      docker cp C:\path\to\dump.sql <container-id>:/tmp/dump.sql
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Load the dump">
+    <CodeGroup>
+      ```bash Plain SQL dump (.sql)
+      docker compose exec db psql -U esp devsite_django -f /tmp/dump.sql
+      ```
+
+      ```bash Custom-format dump (pg_dump -Fc)
+      docker compose exec db pg_restore --verbose --dbname=devsite_django \
+          --no-owner --no-acl -U esp /tmp/dump.sql
+      ```
+    </CodeGroup>
+
+    <Note>
+      If you see ownership or permission errors when loading a dump from a different environment, the `--no-owner --no-acl` flags on `pg_restore` will ignore those. For plain SQL dumps, you can safely ignore `ALTER OWNER` errors — the data will still load correctly.
+    </Note>
+  </Step>
+
+  <Step title="Re-run migrations">
+    Ensure the schema matches the current code:
+
+    ```bash
+    docker compose exec web python esp/manage.py migrate
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 8000 (or 5432 or 11211) is in use, either stop the conflicting service or change the port mapping in `docker-compose.yml`:
+
+```yaml docker-compose.yml
+web:
+  ports:
+    - "9000:8000"  # Maps host port 9000 to container port 8000
+```
+
+### Database Connection Errors
+
+The entrypoint script waits for PostgreSQL to be ready, but if you still see connection errors, try:
+
+```bash
+docker compose restart web
+```
+
+### Permission Issues with Mounted Volumes
+
+On Linux, files created inside the container may be owned by root. Fix with:
+
+```bash
+sudo chown -R $USER:$USER .
+```
+
+### Stale Containers
+
+If things seem broken after a `git pull`, try a clean rebuild:
+
+```bash
+docker compose down -v
+FORCE_SETUP=1 docker compose up --build
+```
+
+### Build Fails with "Invalid File Request"
+
+If you see an error like `invalid file request esp/public/media/images` during `docker compose build`, run `docker compose down` first to remove the symlinks created by the entrypoint:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+### Docker Desktop Not Running (Windows/macOS)
+
+**Windows error:**
+```
+unable to get image … open //./pipe/dockerDesktopLinuxEngine:
+The system cannot find the file specified.
+```
+
+**macOS error:**
+```
+Cannot connect to the Docker daemon at unix:///var/run/docker.sock.
+Is the docker daemon running?
+```
+
+Both errors mean Docker Desktop is not running. Open **Docker Desktop** and wait until the icon in the system tray (Windows) or menu bar (macOS) shows it is ready.
+
+Verify by running:
+
+```bash
+docker info
+```
+
+If this returns engine details without errors, retry `docker compose up --build`.
+
+<Note>
+  **Windows only:** If the issue persists, open **Docker Desktop → Settings → General** and ensure **"Use the WSL 2 based engine"** is checked, then click **Apply & Restart**.
+</Note>
+
+## Docker Compose Configuration
+
+The `docker-compose.yml` defines three services:
+
+```yaml docker-compose.yml
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: devsite_django
+      POSTGRES_USER: esp
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  memcached:
+    image: memcached:alpine
+    ports:
+      - "11211:11211"
+
+  web:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - memcached
+    environment:
+      VIRTUAL_ENV: /usr
+
+volumes:
+  postgres_data:
+```

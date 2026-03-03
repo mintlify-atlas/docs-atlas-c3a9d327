@@ -1,0 +1,124 @@
+---
+title: Development Setup
+description: Get started with ESP Website development using Docker or local setup
+---
+
+This guide will help you set up a local development environment for the ESP Website. The recommended approach is using Docker, which requires minimal dependencies and works consistently across all platforms.
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Windows/macOS">
+    Install [Docker Desktop](https://docs.docker.com/desktop/), which includes Docker Engine and Docker Compose in a single installer.
+  </Tab>
+  <Tab title="Linux">
+    Install [Docker Engine](https://docs.docker.com/engine/install/) and the [Docker Compose plugin](https://docs.docker.com/compose/install/linux/) separately, or install Docker Desktop for Linux if you prefer a GUI.
+  </Tab>
+</Tabs>
+
+<Note>
+  No Python, Node.js, PostgreSQL, or any other dependency needs to be installed on your host machine when using Docker.
+</Note>
+
+## Docker Architecture
+
+The Docker setup runs three containers:
+
+- **web**: The Django application (Python 3.7)
+- **db**: PostgreSQL 14 database
+- **memcached**: Memcached caching layer
+
+Your working copy is mounted into the container, so you can edit code with your preferred editor on your host machine and see changes reflected immediately.
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the repository">
+    <CodeGroup>
+      ```bash HTTPS
+      git clone https://github.com/learning-unlimited/ESP-Website.git devsite
+      cd devsite
+      ```
+
+      ```bash SSH
+      git clone git@github.com:learning-unlimited/ESP-Website.git devsite
+      cd devsite
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Build and start services">
+    ```bash
+    docker compose up --build
+    ```
+
+    <Note>
+      The first build will take several minutes as it installs system and Python dependencies. Subsequent starts will be much faster due to Docker layer caching.
+    </Note>
+  </Step>
+
+  <Step title="Wait for automatic setup">
+    The entrypoint script will automatically (on first run):
+
+    - Create `local_settings.py` from the Docker template
+    - Create media symlinks (`images`, `styles`)
+    - Wait for PostgreSQL to be ready
+    - Run database migrations
+    - Collect static files
+
+    On subsequent runs, migrations and static file collection are skipped for faster startup.
+
+    <Info>
+      To force setup steps to run again (e.g., after pulling new code):
+      ```bash
+      FORCE_SETUP=1 docker compose up
+      ```
+    </Info>
+  </Step>
+
+  <Step title="Access the site">
+    Once you see `Starting development server at http://0.0.0.0:8000/`, open your browser and navigate to:
+
+    ```
+    http://localhost:8000
+    ```
+  </Step>
+
+  <Step title="Create an admin account">
+    Open a new terminal and run:
+
+    ```bash
+    docker compose exec web python esp/manage.py createsuperuser
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+The Docker setup uses `esp/esp/local_settings.py.docker` as the template for `local_settings.py`. It is automatically copied on first run.
+
+### Key Configuration Differences
+
+The Docker configuration includes:
+
+- `DATABASES['default']['HOST']` is `'db'` (the Docker service name) instead of `'localhost'`
+- `CACHES['default']['LOCATION']` is `'memcached:11211'` instead of `'127.0.0.1:11211'`
+- `ALLOWED_HOSTS` is `['*']` for convenience in local development
+
+### Customizing Settings
+
+If you need to customize settings:
+
+1. Edit `esp/esp/local_settings.py` directly (it is gitignored)
+2. Or edit `esp/esp/local_settings.py.docker` to change the defaults for all Docker users
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Commands" icon="docker" href="/dev/docker">
+    Learn common Docker commands for development
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/dev/contributing">
+    Read the contribution workflow and guidelines
+  </Card>
+</CardGroup>

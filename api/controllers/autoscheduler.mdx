@@ -1,0 +1,428 @@
+---
+title: Autoscheduler
+description: Automatic scheduling assistant for class sections using constraint satisfaction and optimization
+---
+
+The autoscheduler is a sophisticated scheduling system that automatically assigns class sections to time slots and rooms while satisfying various constraints and optimizing for quality metrics.
+
+## Overview
+
+The autoscheduler uses a constraint-based search algorithm to find optimal placements for class sections. It considers teacher availability, room resources, grade requirements, and various other constraints while trying to maximize metrics like room utilization and student-class-hours.
+
+## Core Components
+
+### AutoschedulerController
+
+The main entry point for the autoscheduler system.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/controller.py`
+
+#### Initialization
+
+```python
+from esp.program.controllers.autoscheduler.controller import AutoschedulerController
+
+controller = AutoschedulerController(program, **options)
+```
+
+**Options structure**:
+- `constraints_*`: Boolean flags for enabling/disabling constraints (e.g., `constraints_LunchConstraint=True`)
+- `scorers_*`: Weight values for scoring functions (e.g., `scorers_NumSectionsScorer=100.0`)
+- `resources_*`: Resource criterion weights, or -1 for required constraints
+- `search_*`: Search configuration parameters
+
+#### Key Methods
+
+##### `compute_assignments()`
+
+Runs the optimization algorithm to find class placements.
+
+```python
+controller.compute_assignments()
+```
+
+This searches for the best schedule using the configured depth and timeout settings.
+
+##### `get_scheduling_info()`
+
+Returns human-readable information about what changed.
+
+```python
+info = controller.get_scheduling_info()
+# Returns list of actions: schedule, move, unschedule, swap
+```
+
+##### `export_assignments()` and `import_assignments(data)`
+
+Save and restore scheduling decisions.
+
+```python
+# Export current state
+data = controller.export_assignments()
+
+# Import saved state
+controller.import_assignments(data)
+```
+
+##### `save_assignments()`
+
+Persists the computed schedule to the database.
+
+```python
+controller.save_assignments()
+```
+
+#### Static Configuration Methods
+
+##### `constraint_options(prog)`
+
+Returns available constraints with descriptions.
+
+```python
+options = AutoschedulerController.constraint_options(program)
+# Returns: {constraint_name: (enabled, description)}
+```
+
+##### `scorer_options(prog)`
+
+Returns available scorers with their weights.
+
+```python
+options = AutoschedulerController.scorer_options(program)
+# Returns: {scorer_name: (weight, description)}
+```
+
+##### `resource_options(prog)`
+
+Returns resource criteria configuration.
+
+```python
+options = AutoschedulerController.resource_options(program)
+# Returns: {criterion_name: (weight_or_minus_1, specification)}
+```
+
+##### `search_options(prog, section=None)`
+
+Returns search configuration options.
+
+```python
+options = AutoschedulerController.search_options(program)
+# Returns dict with keys:
+# - section_emailcode: Section to optimize
+# - depth: Search depth (1-3 recommended)
+# - timeout: Timeout in seconds
+# - require_approved: Only schedule approved classes
+# - exclude_lunch: Don't schedule lunch classes
+# - exclude_walkins: Don't schedule walk-ins
+# - exclude_scheduled: Don't touch already-scheduled classes
+# - exclude_locked: Don't touch locked classes
+```
+
+### Data Model
+
+The autoscheduler uses in-memory data structures for performance.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/data_model.py`
+
+#### AS_Schedule
+
+Represents a complete program schedule.
+
+```python
+class AS_Schedule:
+    def __init__(self, program, timeslots, class_sections, 
+                 teachers, classrooms, lunch_timeslots, 
+                 constraints, exclude_locked=True)
+```
+
+**Attributes**:
+- `program`: Program object
+- `timeslots`: List of AS_Timeslot objects
+- `class_sections`: Dict of `{section_id: AS_ClassSection}`
+- `teachers`: Dict of `{teacher_id: AS_Teacher}`
+- `classrooms`: Dict of `{classroom_name: AS_Classroom}`
+- `lunch_timeslots`: Dict mapping days to lunch timeslot lists
+- `constraints`: CompositeConstraint object
+
+#### AS_ClassSection
+
+Represents a class section to be scheduled.
+
+**Attributes**:
+- `id`: Section ID
+- `parent_class`: Parent class ID
+- `duration`: Duration in hours
+- `teachers`: List of AS_Teacher objects
+- `capacity`: Maximum student capacity
+- `grade_min`, `grade_max`: Grade range
+- `category`: Category ID
+- `assigned_roomslots`: Sorted list of assigned AS_RoomSlot objects
+- `resource_requests`: Dict of requested resources
+
+#### AS_Classroom
+
+Represents a classroom with availability.
+
+**Key Method**:
+```python
+roomslots = classroom.get_roomslots_by_duration(start_roomslot, duration)
+```
+
+Returns the list of contiguous roomslots needed to schedule a section of the given duration.
+
+#### AS_Teacher
+
+**Attributes**:
+- `id`: Teacher ID
+- `availability`: List of available timeslots
+- `taught_sections`: Dict of sections being taught
+- `is_admin`: Whether teacher is an admin
+- `availability_dict`: Fast lookup of (start, end) tuples
+
+### Constraints
+
+Constraints define what schedules are legal.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/constraints.py`
+
+#### Required Constraints
+
+These are always enforced:
+
+- **ContiguousConstraint**: Multi-hour sections must be in contiguous timeblocks in the same room
+- **PreconditionConstraint**: Only unschedule already-scheduled classes, etc.
+- **RoomAvailabilityConstraint**: Only use reserved rooms
+- **RoomConcurrencyConstraint**: No double-booking rooms
+- **SectionDurationConstraint**: Sections scheduled for exact duration
+- **TeacherAvailabilityConstraint**: Teachers only teach when available
+- **TeacherConcurrencyConstraint**: Teachers can't teach two classes at once
+
+#### Optional Constraints
+
+- **LunchConstraint**: Don't schedule multi-hour sections over both lunch blocks
+- **ResourceCriteriaConstraint**: Enforce custom resource criteria
+
+#### Configuration
+
+Constraints can be enabled via tags or user input:
+
+```python
+# Default configuration
+DEFAULT_CONSTRAINTS_ENABLED = {
+    "LunchConstraint": True,
+    "ResourceCriteriaConstraint": True,
+}
+
+# Override via program tag
+CONSTRAINT_TAG = "autoscheduler_constraint_overrides"
+```
+
+### Scoring
+
+Scorers evaluate schedule quality (higher is better).
+
+**Location**: `esp/esp/program/controllers/autoscheduler/scoring.py`
+
+#### Available Scorers
+
+| Scorer | Default Weight | Description |
+|--------|---------------|-------------|
+| NumSectionsScorer | 100.0 | Schedule as many sections as possible |
+| ResourceMatchingScorer | 500.0 | Match requested resources |
+| ResourceValueMatchingScorer | 450.0 | Match requested resource values |
+| RoomSizeMismatchScorer | 350.0 | Use appropriately sized rooms |
+| ResourceCriteriaScorer | 300.0 | Score custom resource criteria |
+| AdminDistributionScorer | 70.0 | Distribute admin classes evenly, not in morning |
+| HungryTeacherScorer | 70.0 | Avoid teachers teaching both lunch blocks |
+| NumSubjectsScorer | 60.0 | Schedule distinct classes |
+| NumTeachersScorer | 50.0 | Schedule distinct teachers |
+| StudentClassHoursScorer | 50.0 | Maximize student-class-hours |
+| LunchStudentClassHoursScorer | 20.0 | Prioritize non-lunch scheduling |
+| CategoryBalanceScorer | 10.0 | Balance categories evenly |
+| RoomConsecutivityScorer | 10.0 | Schedule classes consecutively in rooms |
+| TeachersWhoLikeRunningScorer | 10.0 | Avoid back-to-back in different rooms |
+
+#### Configuration
+
+```python
+# Default weights
+DEFAULT_SCORER_WEIGHTS = {
+    "NumSectionsScorer": 100.0,
+    "ResourceMatchingScorer": 500.0,
+    # ...
+}
+
+# Override via program tag
+SCORER_TAG = "autoscheduler_scorer_weight_overrides"
+```
+
+Set weight to 0 to disable a scorer.
+
+### Resource Criteria
+
+Custom resource matching rules can be defined.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/config.py`
+
+#### Constraint Example
+
+```python
+DEFAULT_RESOURCE_CONSTRAINTS = {
+    "restrict_star_classrooms": 
+        "if any section then not classroom matches ^\\*.*$",
+    "restrict_star_classrooms_comment":
+        "Ignore all classrooms with names marked with a star"
+}
+
+# Override via program tag
+RESOURCE_CONSTRAINTS_TAG = "autoscheduler_resource_constraint_overrides"
+```
+
+#### Scoring Example
+
+```python
+DEFAULT_RESOURCE_SCORING = {
+    # Custom criteria with relative weights
+}
+
+RESOURCE_SCORING_TAG = "autoscheduler_resource_scoring_overrides"
+```
+
+### Search Algorithm
+
+The search uses depth-limited DFS to find improvements.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/search.py`
+
+#### SearchOptimizer
+
+```python
+class SearchOptimizer:
+    def optimize_section(self, section, depth, timeout=None)
+```
+
+**Algorithm**:
+1. Try all possible room slots for the target section
+2. If a slot is occupied, recursively try to move the conflicting section (up to depth)
+3. Evaluate the score after each complete assignment
+4. Keep the best solution found
+
+**Depth recommendations**:
+- Depth 1: Only schedule into empty slots
+- Depth 2: Can move one blocking section
+- Depth 3: Can move chains of 2 sections (slow)
+- Depth 4+: Too slow for practical use
+
+## Configuration
+
+**Location**: `esp/esp/program/controllers/autoscheduler/config.py`
+
+### Key Constants
+
+```python
+# Minimum timeslot length (hours)
+DELTA_TIME = 0.34
+
+# Enable performance timing
+USE_TIMER = False
+```
+
+### Tag-based Configuration
+
+Program-specific overrides use Django tags:
+
+- `autoscheduler_constraint_overrides`: JSON dict of constraint overrides
+- `autoscheduler_scorer_weight_overrides`: JSON dict of scorer weights
+- `autoscheduler_resource_constraint_overrides`: JSON dict of resource constraints
+- `autoscheduler_resource_scoring_overrides`: JSON dict of resource scoring
+
+## Usage Example
+
+```python
+from esp.program.models import Program
+from esp.program.controllers.autoscheduler.controller import AutoschedulerController
+
+# Load program
+program = Program.objects.get(id=123)
+
+# Configure autoscheduler
+options = {
+    # Enable constraints
+    'constraints_LunchConstraint': True,
+    
+    # Set scorer weights
+    'scorers_NumSectionsScorer': 100.0,
+    'scorers_RoomSizeMismatchScorer': 350.0,
+    
+    # Search parameters
+    'search_section_emailcode': 'S1234s1',
+    'search_depth': 2,
+    'search_timeout': 10.0,
+    'search_require_approved': True,
+    'search_exclude_lunch': True,
+}
+
+# Run autoscheduler
+controller = AutoschedulerController(program, **options)
+controller.compute_assignments()
+
+# Review results
+info = controller.get_scheduling_info()
+for action_group in info:
+    for action in action_group:
+        print(action)
+
+# Save to database
+controller.save_assignments()
+```
+
+## Database Integration
+
+The autoscheduler loads data from and saves back to Django models.
+
+**Location**: `esp/esp/program/controllers/autoscheduler/db_interface.py`
+
+### Loading
+
+```python
+from esp.program.controllers.autoscheduler import db_interface
+
+schedule = db_interface.load_schedule_from_db(program, **search_options)
+```
+
+### Saving
+
+```python
+db_interface.save(schedule)
+```
+
+This updates `ClassSection` meeting times in the database based on the in-memory schedule.
+
+## Error Handling
+
+The autoscheduler defines custom exceptions:
+
+**Location**: `esp/esp/program/controllers/autoscheduler/exceptions.py`
+
+```python
+from esp.program.controllers.autoscheduler.exceptions import SchedulingError
+
+try:
+    controller.compute_assignments()
+except SchedulingError as e:
+    print(f"Scheduling failed: {e}")
+```
+
+## Performance Considerations
+
+- The autoscheduler loads the entire program schedule into memory
+- Search depth 3+ can be very slow for large programs
+- Use `USE_TIMER = True` in config to profile performance
+- Resource matching is one of the most expensive operations
+- Consider limiting the number of sections to optimize at once
+
+## See Also
+
+- [Lottery Controller](/api/controllers/lottery) - For lottery-based student assignment
+- Program models in `esp/esp/program/models`
+- Resource models in `esp/esp/resources/models`

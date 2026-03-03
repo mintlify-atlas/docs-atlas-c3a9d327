@@ -1,0 +1,327 @@
+---
+title: Programs
+description: Understanding how programs work in the ESP Website - the core organizational unit for educational events like Splash and HSSP
+---
+
+## What is a Program?
+
+A **Program** is the core organizational unit in the ESP Website. Each program represents a distinct educational event, such as:
+
+- **Splash Fall 2024** - A weekend program with hundreds of classes
+- **HSSP Spring 2024** - A multi-week Saturday program
+- **Spark 2024** - A one-day program for younger students
+
+Every program is a separate instance with its own classes, registrations, resources, and configuration.
+
+## Program Structure
+
+### Key Components
+
+A program consists of several interconnected elements:
+
+<CardGroup cols={2}>
+  <Card title="Classes" icon="chalkboard-user">
+    The educational content offered during the program (see [Classes](/concepts/classes))
+  </Card>
+  <Card title="Users" icon="users">
+    Students, teachers, and administrators participating in the program (see [Users](/concepts/users))
+  </Card>
+  <Card title="Registrations" icon="clipboard-list">
+    How students sign up for and enroll in classes (see [Registration](/concepts/registration))
+  </Card>
+  <Card title="Schedule" icon="calendar">
+    Time blocks and room assignments for when classes meet
+  </Card>
+</CardGroup>
+
+### Database Model
+
+The `Program` model is defined in `esp/esp/program/models/__init__.py` and includes:
+
+```python
+class Program(models.Model):
+    url = models.CharField(max_length=80, unique=True)
+    name = models.CharField(max_length=80)
+    grade_min = models.IntegerField()
+    grade_max = models.IntegerField()
+    director_email = models.EmailField(...)
+    program_size_max = models.IntegerField(null=True)
+    program_allow_waitlist = models.BooleanField(default=False)
+    program_modules = models.ManyToManyField(ProgramModule, ...)
+    class_categories = models.ManyToManyField('ClassCategories', ...)
+```
+
+## Program Identification
+
+Each program has two key identifiers:
+
+### Program URL
+
+The URL uniquely identifies a program and follows the pattern: `{type}/{instance}`
+
+Examples:
+- `Splash/2024_Fall`
+- `HSSP/2024_Spring`
+- `Spark/2024`
+
+<Note>
+  The program URL is used throughout the website in paths like `/learn/Splash/2024_Fall/catalog` or `/teach/HSSP/2024_Spring/`
+</Note>
+
+### Program Name
+
+The human-readable name displayed to users, like "Splash Fall 2024" or "HSSP Spring 2024".
+
+## Program Types and Instances
+
+Programs are organized by type and instance:
+
+- **Program Type**: The kind of program (e.g., "Splash", "HSSP", "Spark")
+- **Program Instance**: The specific occurrence (e.g., "2024_Fall", "2024_Spring")
+
+You can access these via:
+
+```python
+program.program_type      # Returns 'Splash'
+program.program_instance  # Returns '2024_Fall'
+```
+
+## Configuration Options
+
+### Grade Restrictions
+
+Programs can specify which grades are eligible:
+
+```python
+program.grade_min = 7   # 7th grade minimum
+program.grade_max = 12  # 12th grade maximum
+program.grades()        # Returns [7, 8, 9, 10, 11, 12]
+```
+
+### Capacity Management
+
+Programs can have enrollment caps:
+
+- **program_size_max**: Overall program capacity (0 = no cap)
+- **program_allow_waitlist**: Whether to allow waitlisted students
+- **program_size_by_grade**: Tag for per-grade capacity limits
+
+<CodeGroup>
+```python Overall Cap
+# Simple program-wide capacity
+program.program_size_max = 500
+```
+
+```json Per-Grade Cap
+// Set via Tag: program_size_by_grade
+{
+  "9": 150,
+  "10": 150,
+  "11-12": 200
+}
+```
+</CodeGroup>
+
+### Director Contact
+
+Each program has contact emails for different purposes:
+
+- **director_email**: Main contact for the program
+- **director_cc_email**: CC'd on automated emails (optional)
+- **director_confidential_email**: For sensitive communications like financial aid (optional)
+
+## Program Modules
+
+Programs use a modular system for features. Modules can be enabled/disabled per program:
+
+<AccordionGroup>
+  <Accordion title="Student Registration Modules">
+    - **StudentClassRegModule**: Core class registration
+    - **StudentRegCore**: Basic student registration
+    - **StudentRegTwo**: Two-phase lottery registration
+  </Accordion>
+  
+  <Accordion title="Teacher Modules">
+    - **TeacherClassRegModule**: Class submission and management
+    - **AvailabilityModule**: Teacher availability entry
+    - **TeacherEventsModule**: Teacher interviews/training
+  </Accordion>
+  
+  <Accordion title="Administrative Modules">
+    - **AdminClass**: Class management interface
+    - **AJAXSchedulingModule**: Drag-and-drop scheduling
+    - **ResourceModule**: Room and resource management
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  See the [Program Modules documentation](https://github.com/learning-unlimited/ESP-Website/blob/main/docs/admin/program_modules.rst) for a complete list and detailed descriptions.
+</Note>
+
+## Working with Programs
+
+### Getting Current Programs
+
+The system can identify "current" programs based on dates:
+
+```python
+Program.current_programs()
+# Returns programs that are:
+# - Running now, or
+# - Starting within 60 days, or
+# - Ended within 30 days
+```
+
+### Accessing Program Data
+
+```python
+# Get all classes in a program
+program.classes()
+
+# Get all sections (class instances)
+program.sections()
+
+# Get time slots
+program.getTimeSlots()
+
+# Get students/teachers
+program.students()  # Returns dict of student querysets
+program.teachers()  # Returns dict of teacher querysets
+```
+
+### Program Permissions
+
+Administrators need specific permissions for each program:
+
+```python
+# Check if user can administer program
+user.isAdministrator(program)
+
+# Grant admin permission
+Permission.objects.create(
+    user=user,
+    program=program,
+    permission_type="Administer"
+)
+```
+
+## Program Lifecycle
+
+### Creating a Program
+
+1. **Create the Program object** with basic info (name, URL, grade range)
+2. **Add program modules** to enable features
+3. **Configure settings** via Tags (program-specific configuration)
+4. **Create time blocks** for when classes can meet
+5. **Set up resources** (classrooms, equipment)
+6. **Open teacher registration** to collect class proposals
+7. **Review and approve classes**
+8. **Create schedule** by assigning times and rooms
+9. **Open student registration**
+10. **Run the program!**
+
+### Post-Program
+
+After a program ends:
+- Classes are archived for historical reference
+- Reports can be generated on attendance, class popularity, etc.
+- Data is retained for future program planning
+
+## Related Models
+
+<CardGroup cols={2}>
+  <Card title="ClassSubject" icon="book">
+    Individual classes offered in the program
+  </Card>
+  <Card title="ClassSection" icon="chalkboard">
+    Specific meeting times/instances of classes
+  </Card>
+  <Card title="Event" icon="clock">
+    Time blocks when classes can be scheduled
+  </Card>
+  <Card title="Resource" icon="door-open">
+    Classrooms and equipment available
+  </Card>
+</CardGroup>
+
+## Examples
+
+### Checking Program Capacity
+
+```python
+def can_student_join(student, program):
+    """Check if a student can join a program."""
+    
+    # Program uses capacity limits
+    if program.program_size_max or program.grade_caps():
+        return program.user_can_join(student)
+    
+    # No capacity limits
+    return True
+```
+
+### Getting Program Date Range
+
+```python
+# Get formatted date range
+program.date_range()
+# Returns: "Nov. 16 - 17, 2024" or "Nov. 16, 2024"
+
+# Get individual dates
+program.dates()
+# Returns: [date(2024, 11, 16), date(2024, 11, 17)]
+```
+
+### Working with Program URLs
+
+```python
+# Access URLs for different interfaces
+program.get_teach_url()   # /teach/Splash/2024_Fall/
+program.get_learn_url()   # /learn/Splash/2024_Fall/
+program.get_manage_url()  # /manage/Splash/2024_Fall/
+program.get_onsite_url()  # /onsite/Splash/2024_Fall/
+```
+
+## Best Practices
+
+<Tip>
+  **Plan ahead**: Set up your program structure (modules, time blocks, resources) well before opening registration.
+</Tip>
+
+<Warning>
+  **Unique URLs**: Each program must have a unique URL. Attempting to create a program with a duplicate URL will fail.
+</Warning>
+
+<Tip>
+  **Test programs**: Many organizations create test programs (with "test" in the name) to try out new features before using them in production.
+</Tip>
+
+## Common Tasks
+
+### Find all students enrolled in any class
+
+```python
+students = program.students()['classreg']
+student_count = students.count()
+```
+
+### Find all approved teachers
+
+```python
+teachers = program.teachers()['class_approved']
+```
+
+### Check if a program uses financial aid
+
+```python
+if program.hasModule('StudentFinancialAidModule'):
+    # Financial aid is enabled
+    aid_requests = FinancialAidRequest.objects.filter(program=program)
+```
+
+### Lock all class schedules
+
+```python
+# Prevent automatic scheduling from changing assignments
+program.lock_schedule(lock_level=1)
+```

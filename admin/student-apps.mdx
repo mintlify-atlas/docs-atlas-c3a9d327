@@ -1,0 +1,533 @@
+---
+title: Student Applications
+description: Set up and manage application-based admission for programs and classes using Formstack
+---
+
+The ESP Website supports student applications for both program-wide admission and individual class admission. This guide covers the newer (circa 2012) Formstack-based application system.
+
+<Note>
+There's an older (circa 2007) application questions module still in the codebase. This documentation covers the newer Formstack integration, which is the recommended approach.
+</Note>
+
+## Overview
+
+The application system uses **Formstack**, a third-party form builder, as the backend for creating and collecting application responses. The ESP Website integrates with Formstack to:
+
+- Display application forms to students
+- Link applications to student accounts and classes
+- Provide review interfaces for teachers and admins
+- Track application statuses and decisions
+
+<Warning>
+You must have a Formstack account to use this feature. The application form is created and hosted on Formstack, then integrated with the ESP Website.
+</Warning>
+
+## Required Program Modules
+
+Enable these modules for your program:
+
+<Steps>
+  <Step title="FormstackAppModule">
+    Student-facing module that embeds the Formstack application form.
+    
+    Students access it at `/learn/[program]/[instance]/studentapp`
+  </Step>
+  
+  <Step title="TeacherAdmissionsDashboard">
+    Teacher interface to review applications for their classes.
+    
+    Teachers access it at `/teach/[program]/[instance]/admissions`
+  </Step>
+  
+  <Step title="AdminAdmissionsDashboard">
+    Admin interface to review all program applications.
+    
+    Admins access it at `/manage/[program]/[instance]/admissions`
+  </Step>
+</Steps>
+
+## Formstack Form Setup
+
+### Creating the Application Form
+
+In Formstack, create an application form with the following **required fields**:
+
+<Accordion title="Username Field">
+**Type**: Text field
+
+**Configuration**:
+- Mark as **required**
+- Mark as **read-only**
+- Will be pre-populated by the website when user is logged in
+- Used to link applications with ESP accounts
+</Accordion>
+
+<Accordion title="Class Choice Fields">
+**Type**: Dropdown
+
+**Configuration**:
+- One dropdown for each class selection slot
+- Each dropdown asks "Which class are you applying to?"
+- Options: One for each class in the program
+- **Use separate values**: Check this option
+- **Option values**: Enter each class's ID number from the ESP Website
+- Links applications to specific classes
+
+Example dropdown configuration:
+```
+Option Label          | Option Value
+---------------------|--------------
+Intro to Physics     | 1423
+Advanced Biology     | 1424  
+Creative Writing     | 1425
+```
+
+The option value is the class's numeric ID in the ESP database.
+</Accordion>
+
+### Additional Fields
+
+Add any other fields you want:
+- Why are you interested in this class?
+- What relevant experience do you have?
+- Demographic information
+- Open-ended questions
+- Multiple choice or rating scales
+
+Formstack provides a flexible form builder - customize as needed for your program.
+
+### Configuring the Webhook
+
+Formstack needs to notify the ESP Website when applications are submitted.
+
+<Steps>
+  <Step title="Open Form Settings">
+    In Formstack, go to your application form's settings
+  </Step>
+  
+  <Step title="Add Webhook">
+    Add a webhook with this URL:
+    ```
+    http://WEBSITE_URL/formstack_webhook
+    ```
+    
+    Replace `WEBSITE_URL` with your site:
+    - `esp.mit.edu`
+    - `stanfordesp.org`
+    - `splashchicago.learningu.org`
+    - etc.
+  </Step>
+  
+  <Step title="Save Webhook">
+    The webhook will notify the ESP Website whenever the form is submitted, keeping the database in sync
+  </Step>
+</Steps>
+
+<Note>
+Webhooks create a live connection between Formstack and your ESP Website. Every form submission is automatically recorded in your database.
+</Note>
+
+## ESP Website Configuration
+
+After creating the Formstack form, configure the ESP Website integration:
+
+### Formstack App Settings
+
+Navigate to `/admin/application/formstackappsettings/` and find your program.
+
+<Steps>
+  <Step title="Enter API Key">
+    1. Get your Formstack API key (v1) from your Formstack account
+    2. Enter it in the "Formstack API key" field
+    3. Click "Save and continue editing"
+  </Step>
+  
+  <Step title="Select Form">
+    1. A list of forms connected to your account will appear
+    2. Enter the form ID number for your application form
+    3. Click "Save and continue editing"
+  </Step>
+  
+  <Step title="Map Fields">
+    1. A list of questions in your form will appear
+    2. Enter field ID numbers for:
+       - **Username field**: Links applications to accounts
+       - **Core class fields**: Links applications to classes
+    3. These field IDs come from Formstack
+  </Step>
+  
+  <Step title="Create Teacher View Template">
+    Enter HTML template for what teachers see when viewing applications.
+    
+    Use template variables to include student responses:
+    - `{{ field_XXXXX }}` - Replace XXXXX with field ID
+    - `{{ username }}` - Student's username
+    - `{{ student_name }}` - Student's name
+    
+    Example:
+    ```html
+    <h3>Application from {{ student_name }}</h3>
+    <p><strong>Why interested:</strong> {{ field_12345 }}</p>
+    <p><strong>Experience:</strong> {{ field_12346 }}</p>
+    ```
+  </Step>
+  
+  <Step title="(Optional) Financial Aid Form">
+    If using Formstack for financial aid too, configure those settings similarly
+  </Step>
+</Steps>
+
+### Opening Applications
+
+Applications are initially closed to prevent students from seeing the form before you're ready.
+
+<Steps>
+  <Step title="Test as Admin">
+    1. Visit `/learn/[program]/[instance]/studentapp`
+    2. Verify the form appears correctly
+    3. Check that username is pre-filled
+    4. Edit the page content (editable text area) as desired
+  </Step>
+  
+  <Step title="Open to Students">
+    1. Return to `/admin/application/formstackappsettings/`
+    2. Check "App is currently open"
+    3. Save
+    4. The "Continue" button becomes visible to all users
+  </Step>
+  
+  <Step title="Publish Link">
+    Share `/learn/[program]/[instance]/studentapp` as your application link
+  </Step>
+</Steps>
+
+## Student Workflow
+
+How students experience the application process:
+
+<Steps>
+  <Step title="Access Application Page">
+    Student visits `/learn/[program]/[instance]/studentapp`
+    
+    Sees editable content explaining the application process
+  </Step>
+  
+  <Step title="Click Continue">
+    Button takes them to the Formstack form
+    
+    Username field is automatically filled in
+  </Step>
+  
+  <Step title="Complete Form">
+    Student:
+    - Selects classes from dropdowns
+    - Answers all questions
+    - Submits the form on Formstack
+  </Step>
+  
+  <Step title="Webhook Fires">
+    Formstack notifies ESP Website
+    
+    Application is recorded in database and linked to student account and selected classes
+  </Step>
+</Steps>
+
+## Admin Workflow
+
+How administrators review and manage applications:
+
+### Accessing the Dashboard
+
+Visit `/manage/[program]/[instance]/admissions`
+
+You'll see:
+- Dropdown menu to select classes
+- Large table with applications and columns for review
+
+### Reviewing Applications
+
+<Steps>
+  <Step title="Select a Class">
+    Use the dropdown menu to choose which class's applications to view
+    
+    All applicants for that class appear in the table
+  </Step>
+  
+  <Step title="View Application">
+    Click on a student's name
+    
+    Application opens in a new window, formatted according to your "teacher view template"
+  </Step>
+  
+  <Step title="Set Admin Status">
+    Change the student's "admin status" in the table:
+    - **Approved**: Application approved by admin; visible to teacher
+    - **Rejected**: Application not approved
+    - **Pending**: Under review
+    - Other custom statuses
+    
+    The "Save" button becomes active when you make changes
+  </Step>
+  
+  <Step title="Add Comments">
+    Click "(click to add comment)" under admin comment
+    
+    Dialog appears for entering notes about the application
+  </Step>
+  
+  <Step title="Save Changes">
+    Click the "Save" button to commit your decisions
+  </Step>
+  
+  <Step title="Verify">
+    Click "Refresh" to repopulate the table
+    
+    Confirm your changes are still there
+  </Step>
+</Steps>
+
+<Note>
+Teachers can only see applications with admin status set to "Approved". Use this to control which applications teachers review.
+</Note>
+
+## Teacher Workflow
+
+How teachers review applications for their classes:
+
+### Accessing Applications
+
+Visit `/teach/[program]/[instance]/admissions`
+
+Interface similar to admin view but with:
+- Fewer columns in the table
+- Blank pane on the right side
+- Only shows **approved** applications
+
+### Reviewing and Rating
+
+<Steps>
+  <Step title="Select Class">
+    Choose which class to review from the dropdown
+    
+    Only approved applicants appear
+  </Step>
+  
+  <Step title="View Application">
+    Click on student's name
+    
+    Application appears in the right-hand pane (not new window)
+  </Step>
+  
+  <Step title="Rate Student">
+    Change student's "Rating":
+    - Green
+    - Yellow
+    - Red  
+    - None
+    
+    Table automatically sorts by rating (Green > Yellow > Red > None)
+  </Step>
+  
+  <Step title="Add Comments">
+    Add teacher comments about the applicant
+  </Step>
+  
+  <Step title="Save Decisions">
+    Save changes - they will be reflected in the admin view
+  </Step>
+</Steps>
+
+### Teacher Review of Class Applications
+
+If using the **TeacherReviewApps** module, teachers can create optional application questions for their individual classes.
+
+- Questions are optional for teachers to create
+- Once created, questions become required for students applying to that class
+- Used in conjunction with StudentJunctionAppModule
+
+<Warning>
+Only use TeacherReviewApps if you intend to review responses for admission decisions. Otherwise it's confusing and unnecessary.
+</Warning>
+
+## Application Status Workflow
+
+Typical progression:
+
+```
+1. Student submits application
+   ↓
+2. Admin reviews → Sets status to "Approved" or "Rejected"
+   ↓
+3. If approved → Application visible to teacher
+   ↓
+4. Teacher reviews → Rates as Green/Yellow/Red
+   ↓
+5. Admin sees teacher ratings → Makes final admission decisions
+   ↓
+6. Students notified of admission status
+```
+
+## Integration with Registration
+
+Applications complement the standard registration modules:
+
+<Accordion title="Application-Only Programs">
+Programs where students apply for general admission:
+
+1. Enable FormstackAppModule
+2. Students complete application
+3. Admins review and approve
+4. Approved students gain access to regular registration
+</Accordion>
+
+<Accordion title="Class-Specific Applications">
+Programs where students apply to individual classes:
+
+1. Enable StudentClassRegModule (for browsing catalog)
+2. Enable FormstackAppModule
+3. Students see catalog but apply rather than register directly
+4. Teachers/admins review applications
+5. Admitted students are enrolled
+</Accordion>
+
+<Accordion title="Hybrid Approach">
+Some classes require applications, others are open enrollment:
+
+1. Use applications for selective classes
+2. Regular registration for non-selective classes
+3. Students can do both during registration period
+</Accordion>
+
+## Custom Forms Alternative
+
+While Formstack is the recommended backend, the system is designed to potentially support other backends including:
+
+- Custom forms built into the ESP Website
+- Other third-party form services
+
+Currently, only Formstack is fully supported.
+
+## Best Practices
+
+### Form Design
+
+<Steps>
+  <Step title="Keep it concise">
+    Long applications reduce completion rates. Ask only essential questions.
+  </Step>
+  
+  <Step title="Make expectations clear">
+    Tell students what you're looking for in responses
+  </Step>
+  
+  <Step title="Test thoroughly">
+    Submit test applications to verify:
+    - Username pre-population works
+    - Class dropdowns are correct
+    - Webhook fires and records to database
+    - Teacher view displays properly
+  </Step>
+  
+  <Step title="Provide deadline">
+    Clearly communicate application deadline to students
+  </Step>
+</Steps>
+
+### Review Process
+
+1. **Set expectations with teachers**: Explain the rating system and timeline
+2. **Review regularly**: Don't let applications pile up
+3. **Communicate decisions**: Email students about admission status
+4. **Track in spreadsheet**: Export data from Formstack for additional analysis if needed
+
+### Timeline
+
+<Steps>
+  <Step title="1 month before">
+    Create Formstack form, configure ESP Website integration, test
+  </Step>
+  
+  <Step title="2 weeks before">
+    Announce application process to prospective students
+  </Step>
+  
+  <Step title="Application period">
+    1-2 weeks for students to submit
+  </Step>
+  
+  <Step title="Review period">
+    1 week for admin/teacher review
+  </Step>
+  
+  <Step title="After decisions">
+    Notify students, handle appeals, finalize enrollment
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Username field not pre-filling">
+**Check**:
+- Field is marked as read-only in Formstack
+- Student is logged in when accessing the application
+- Formstack form ID is correct in settings
+</Accordion>
+
+<Accordion title="Applications not appearing in database">
+**Verify**:
+- Webhook is configured correctly in Formstack
+- Webhook URL matches your site
+- Username field and class field IDs are mapped correctly
+- Check Django logs for webhook errors
+</Accordion>
+
+<Accordion title="Teachers can't see applications">
+**Ensure**:
+- Admin status is set to "Approved"
+- TeacherAdmissionsDashboard module is enabled
+- Teacher is associated with the class
+</Accordion>
+
+<Accordion title="Template not displaying responses">
+**Check**:
+- Field ID variables match Formstack field IDs exactly
+- HTML template is valid
+- Field IDs are entered in settings correctly
+</Accordion>
+
+## Financial Aid via Formstack
+
+The same system can be used for financial aid applications:
+
+1. Create separate Formstack form for financial aid
+2. Configure in the financial aid section of FormstackAppSettings
+3. Similar field mapping process
+4. Separate teacher view template for financial aid
+
+This allows secure collection of sensitive information (income, family circumstances) that shouldn't be in the ESP database.
+
+## Getting Help
+
+<Note>
+For application system assistance:
+
+**Contact**: websupport@learningu.org
+
+**Provide**:
+- Your site URL
+- Program name
+- Formstack form link
+- Description of the issue
+- Screenshots if helpful
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Program Modules" href="./program-modules">
+    Learn about all available program modules
+  </Card>
+  <Card title="Creating Programs" href="./creating-programs">
+    Set up new programs with applications
+  </Card>
+</CardGroup>

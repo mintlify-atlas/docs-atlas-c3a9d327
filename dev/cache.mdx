@@ -1,0 +1,266 @@
+---
+title: Caching Framework
+description: ESP's ArgCache system for function-level caching with automatic dependency tracking and invalidation
+---
+
+The ESP caching framework provides a function-level caching system that simplifies caching operations and maintains correctness through automatic cache invalidation. The framework is designed to minimize boilerplate code and ensure caches are invalidated correctly when dependent data changes.
+
+## Overview
+
+The caching framework centers around `ArgCache`, which handles:
+
+- Function-level cache parameterization by arguments
+- Automatic cache key generation from Python objects
+- Dependency tracking and propagation
+- Bulk invalidation through tokens and signatures
+
+<Warning>
+  Don't cache things unless you're sure you're expiring the cache at the correct times! Incorrect cache invalidation can lead to stale data being served to users.
+</Warning>
+
+## Key Concepts
+
+### ArgCache
+
+The core class that manages cached functions. An `ArgCache` contains a cache parameterized by a list of arguments and exports a similar API to Django's cache objects, but keys are lists of Python objects rather than strings.
+
+### Invalidation Strategy
+
+The framework uses a signature-based invalidation system:
+
+1. Each cache entry stores a value along with a **signature**
+2. Before returning a value, the signature is checked for validity
+3. Invalid signatures cause the cache to behave as if the value never existed
+4. Signatures are computed from shared **tokens** that allow bulk invalidation
+
+### Key Sets
+
+Key sets represent groups of cache keys using dictionaries that map argument names to sets of objects. They support:
+
+- **Wildcard** values (matches everything)
+- **Specific objects** (exact matches)
+- Cartesian products of argument sets
+
+Example key set representation:
+```python
+{'user': user_instance, 'program': wildcard}
+```
+
+### Tokens
+
+Tokens generate signatures for cache entries and enable efficient bulk invalidation. Each `ArgCache` maintains a list of tokens that:
+
+- Generate signatures based on cache keys
+- Know how to invalidate specific classes of key sets
+- Enable targeted cache clearing without invalidating everything
+
+## Using the Cache Decorator
+
+The simplest way to use caching is through the `@cache_function` decorator:
+
+```python
+from argcache import cache_function, wildcard
+
+@cache_function
+def getAvailableTimes(self, program, ignore_classes=False):
+    """
+    Return Event objects representing times a user can teach for a program.
+    """
+    from esp.resources.models import Resource
+    from esp.cal.models import Event
+
+    valid_events = Event.objects.filter(
+        resource__user=self, 
+        anchor=program.anchor
+    )
+
+    if ignore_classes:
+        other_sections = self.getTaughtSections(program)
+        other_times = [
+            sec.meeting_times.values_list('id', flat=True) 
+            for sec in other_sections
+        ]
+        for lst in other_times:
+            valid_events = valid_events.exclude(id__in=lst)
+
+    return valid_events
+```
+
+### Creating Tokens
+
+Tokens allow efficient invalidation of cache subsets:
+
+```python
+# Create a token for keys with specific 'self' and 'program' values
+getAvailableTimes.get_or_create_token(('self', 'program',))
+```
+
+## Managing Dependencies
+
+The framework provides methods to automatically invalidate caches when data changes:
+
+### depend_on_row
+
+Invalidate when a database row changes:
+
+```python
+from argcache import cache_function
+
+@cache_function
+def some_function(user):
+    # ... implementation ...
+    pass
+
+# Invalidate when UserBit changes
+some_function.depend_on_row(
+    lambda: UserBit,  # Model reference as lambda to avoid import issues
+    lambda bit: {'user': bit.user},  # Key set to invalidate
+    lambda bit: bit.applies_to_verb('V/Administer/Edit')  # Optional filter
+)
+```
+
+<Info>
+  Use lambda expressions for model references to avoid circular import issues, since dependencies are processed after all modules load.
+</Info>
+
+### depend_on_cache
+
+Invalidate based on changes to other caches:
+
+```python
+getAvailableTimes.depend_on_cache(
+    getTaughtSections,
+    lambda self=wildcard, program=wildcard, **kwargs: {
+        'self': self, 
+        'program': program, 
+        'ignore_classes': True
+    }
+)
+```
+
+The mapping function uses default arguments to handle implicit wildcards:
+- Default arguments capture wildcard values
+- `**kwargs` captures unknown or irrelevant arguments
+- Return a dictionary specifying which keys to invalidate
+
+### depend_on_m2m
+
+Invalidate when many-to-many relationships change:
+
+```python
+getAvailableTimes.depend_on_m2m(
+    lambda: ClassSection,  # Model with m2m field
+    'meeting_times',  # M2M field name
+    lambda sec, event: {'program': sec.parent_program}  # Key set function
+)
+```
+
+You can provide separate functions for additions and removals:
+
+```python
+some_function.depend_on_m2m(
+    lambda: Model,
+    'm2m_field',
+    add_func=lambda obj, related: {...},  # Called on add
+    rem_func=lambda obj, related: {...}   # Called on remove
+)
+```
+
+## Complete Example
+
+Here's a fully configured cached function:
+
+```python
+from argcache import cache_function, wildcard
+
+@cache_function
+def getAvailableTimes(self, program, ignore_classes=False):
+    """Return Event objects for times a user can teach."""
+    from esp.resources.models import Resource
+    from esp.cal.models import Event
+    from esp.program.models import Program
+
+    valid_events = Event.objects.filter(
+        resource__user=self, 
+        anchor=program.anchor
+    )
+
+    if ignore_classes:
+        other_sections = self.getTaughtSections(program)
+        other_times = [
+            sec.meeting_times.values_list('id', flat=True) 
+            for sec in other_sections
+        ]
+        for lst in other_times:
+            valid_events = valid_events.exclude(id__in=lst)
+
+    return valid_events
+
+# Create token for efficient invalidation
+getAvailableTimes.get_or_create_token(('self', 'program',))
+
+# Depend on other caches
+getAvailableTimes.depend_on_cache(
+    getTaughtSections,
+    lambda self=wildcard, program=wildcard, **kwargs: {
+        'self': self, 
+        'program': program, 
+        'ignore_classes': True
+    }
+)
+
+# Depend on m2m changes
+getAvailableTimes.depend_on_m2m(
+    lambda: ClassSection, 
+    'meeting_times', 
+    lambda sec, event: {'program': sec.parent_program}
+)
+
+# Depend on row changes
+getAvailableTimes.depend_on_row(
+    lambda: Resource, 
+    lambda resource: {
+        'program': Program.objects.get(anchor=resource.event.anchor),
+        'self': resource.user
+    }
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Split Functions for Caching">
+    Since caching works at function-level granularity, split large functions into smaller cacheable pieces. Each function should ideally be side-effect free.
+  </Accordion>
+
+  <Accordion title="Use Lambdas for Forward References">
+    When referencing models before they're defined, wrap them in lambdas:
+    ```python
+    depend_on_row(lambda: UserBit, ...)
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Wildcards in Mappings">
+    When writing cache dependency mappings, wildcard operations return wildcards (similar to NaN), so you rarely need explicit checks.
+  </Accordion>
+
+  <Accordion title="Create Appropriate Tokens">
+    Create tokens that match your invalidation patterns. More specific tokens allow more targeted cache clearing.
+  </Accordion>
+</AccordionGroup>
+
+## Cache Loader
+
+Dependency processing is delayed until after all modules load via the `esp.cache_loader` module, which must be loaded last. After it runs, defining new caches becomes an error.
+
+## Implementation Notes
+
+- Keys are intentionally independent of tokens to enable `get_many` bulk operations
+- The `marinade` module handles stringifying Python objects into cache keys
+- Cache signatures are stored as tuples with the cached value
+- The system uses Django's signal framework for dependency notifications
+
+## Related
+
+- See `esp/esp/tagdict/models.py` for examples of `@cache_function` usage
+- See `esp/esp/dbmail/models.py` for cache dependencies on model changes

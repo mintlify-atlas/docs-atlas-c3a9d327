@@ -1,0 +1,552 @@
+---
+title: Classes
+description: Understanding ClassSubject and ClassSection - how classes are structured and managed in the ESP Website
+---
+
+## Overview
+
+Classes in the ESP Website use a two-level structure:
+
+1. **ClassSubject** - The class itself (e.g., "Introduction to Quantum Mechanics")
+2. **ClassSection** - Specific instances of that class (e.g., Section 1 meeting Saturday 1-2pm, Section 2 meeting Sunday 3-4pm)
+
+This separation allows a single class to be taught multiple times with different schedules.
+
+## ClassSubject: The Class Definition
+
+### What is a ClassSubject?
+
+A `ClassSubject` represents the core definition of a class:
+
+<CardGroup cols={2}>
+  <Card title="Content" icon="book-open">
+    Title, description, prerequisites, and materials
+  </Card>
+  <Card title="Teachers" icon="chalkboard-user">
+    Who is teaching the class
+  </Card>
+  <Card title="Category" icon="tag">
+    Subject area (Math, Science, Arts, etc.)
+  </Card>
+  <Card title="Requirements" icon="list-check">
+    Grade range, class size, duration
+  </Card>
+</CardGroup>
+
+### Database Model
+
+From `esp/esp/program/models/class_.py`:
+
+```python
+class ClassSubject(models.Model):
+    # Basic information
+    title = models.CharField(max_length=200)
+    category = models.ForeignKey(ClassCategories)
+    parent_program = models.ForeignKey(Program)
+    
+    # Teachers (many-to-many)
+    teachers = models.ManyToManyField(ESPUser)
+    
+    # Description and details
+    class_info = models.TextField()  # Description
+    prereqs = models.TextField(blank=True, null=True)
+    
+    # Size constraints
+    class_size_min = models.IntegerField(blank=True, null=True)
+    class_size_max = models.IntegerField(blank=True, null=True)
+    class_size_optimal = models.IntegerField(blank=True, null=True)
+    
+    # Duration and grade level
+    duration = models.DecimalField(max_digits=5, decimal_places=2)
+    grade_min = models.IntegerField()
+    grade_max = models.IntegerField()
+    
+    # Status
+    status = models.IntegerField(choices=STATUS_CHOICES)
+```
+
+### Class Identification
+
+Each class has a unique **email code** for identification:
+
+```python
+class.emailcode()  # Returns: "H9876" or "M1234"
+# Format: {CategorySymbol}{ID}
+```
+
+Examples:
+- `H9876` - History class, ID 9876
+- `M1234` - Math class, ID 1234
+- `S5432` - Science class, ID 5432
+
+<Note>
+  The category symbol is a single letter (or short code) configured for each ClassCategory.
+</Note>
+
+### Class Status
+
+Classes progress through different states:
+
+<Steps>
+  <Step title="Unreviewed">
+    Teacher has submitted the class, awaiting admin review (status = 0)
+  </Step>
+  <Step title="Accepted">
+    Admin has approved the class for the program (status = 10)
+  </Step>
+  <Step title="Hidden">
+    Accepted but not shown in catalog (status = 5)
+  </Step>
+  <Step title="Rejected">
+    Admin has rejected the class (status = -10)
+  </Step>
+  <Step title="Cancelled">
+    Class was accepted but later cancelled (status = -20)
+  </Step>
+</Steps>
+
+```python
+from esp.program.class_status import ClassStatus
+
+class.status == ClassStatus.ACCEPTED    # 10
+class.status == ClassStatus.UNREVIEWED  # 0
+class.status == ClassStatus.CANCELLED   # -20
+```
+
+## ClassSection: The Scheduled Instance
+
+### What is a ClassSection?
+
+A `ClassSection` represents a specific offering of a class with:
+
+- **Meeting times** - When the class meets
+- **Room assignment** - Where the class meets
+- **Capacity** - How many students can enroll
+- **Enrollments** - Which students are registered
+
+### Database Model
+
+```python
+class ClassSection(models.Model):
+    parent_class = models.ForeignKey(ClassSubject)
+    
+    # Scheduling
+    meeting_times = models.ManyToManyField(Event)
+    duration = models.DecimalField(max_digits=5, decimal_places=2)
+    
+    # Capacity
+    max_class_capacity = models.IntegerField(blank=True, null=True)
+    
+    # Status
+    status = models.IntegerField(choices=STATUS_CHOICES)
+    registration_status = models.IntegerField(choices=REGISTRATION_CHOICES)
+    
+    # Moderators (optional)
+    moderators = models.ManyToManyField(ESPUser, blank=True)
+    
+    # Students (through StudentRegistration)
+    registrations = models.ManyToManyField(ESPUser, through='StudentRegistration')
+```
+
+### Section Identification
+
+Sections extend the class email code:
+
+```python
+section.emailcode()  # Returns: "H9876s1" or "M1234s2"
+# Format: {ClassEmailCode}s{SectionIndex}
+```
+
+Examples:
+- `H9876s1` - Section 1 of History class 9876
+- `M1234s2` - Section 2 of Math class 1234
+
+### Section Capacity
+
+Section capacity is determined by multiple factors (in priority order):
+
+1. **max_class_capacity** - Section-specific override
+2. **Room capacity** - Limited by assigned classroom size
+3. **class_size_max** - Parent class maximum
+4. **class_size_optimal** - Preferred class size
+
+```python
+section.capacity  # Computed property considering all factors
+section.num_students()  # Current enrollment count
+section.isFull()  # Is the section at capacity?
+```
+
+<Tip>
+  The capacity calculation is intelligent - it takes the minimum of the room size and class maximum, then applies program-wide multipliers if configured.
+</Tip>
+
+## Relationships Between Classes and Sections
+
+### One-to-Many Relationship
+
+A single ClassSubject can have multiple ClassSections:
+
+```python
+# Get all sections of a class
+class_subject.sections.all()
+class_subject.get_sections()  # Cached version
+
+# Access parent class from section
+section.parent_class
+```
+
+### Example: Multiple Sections
+
+<CodeGroup>
+```python Create Sections
+# Create a class
+quantum = ClassSubject.objects.create(
+    title="Intro to Quantum Mechanics",
+    parent_program=splash_2024,
+    grade_min=10,
+    grade_max=12,
+    duration=1.0,
+    class_size_max=20
+)
+
+# Add teacher
+quantum.teachers.add(teacher_user)
+
+# Create two sections
+section1 = ClassSection.objects.create(
+    parent_class=quantum,
+    duration=1.0
+)
+
+section2 = ClassSection.objects.create(
+    parent_class=quantum,
+    duration=1.0
+)
+```
+
+```python Assign Schedules
+# Section 1: Saturday 1-2pm in Room 101
+saturday_1pm = Event.objects.get(...)
+section1.meeting_times.add(saturday_1pm)
+room_101 = Resource.objects.get(name="Room 101", event=saturday_1pm)
+section1.assign_room(room_101)
+
+# Section 2: Sunday 3-4pm in Room 205
+sunday_3pm = Event.objects.get(...)
+section2.meeting_times.add(sunday_3pm)
+room_205 = Resource.objects.get(name="Room 205", event=sunday_3pm)
+section2.assign_room(room_205)
+```
+</CodeGroup>
+
+Now students can choose which section to attend!
+
+## Class Categories
+
+Classes are organized into categories:
+
+```python
+class ClassCategories(models.Model):
+    category = models.CharField(max_length=32)  # "Math", "Science"
+    symbol = models.CharField(max_length=1)     # "M", "S"
+    seq = models.IntegerField()                 # Display order
+```
+
+Common categories:
+- **Mathematics** (M)
+- **Science** (S)
+- **Humanities** (H)
+- **Arts** (A)
+- **Computer Science** (C)
+- **Walk-in Activity** (W) - for open/drop-in classes
+
+<Note>
+  Categories can be customized per program via the admin interface.
+</Note>
+
+## Scheduling and Resources
+
+### Time Blocks (Events)
+
+Classes meet during time blocks called Events:
+
+```python
+# Get when a section meets
+section.meeting_times.all()  # QuerySet of Event objects
+section.start_time()         # First meeting time
+section.end_time()           # Last meeting time
+
+# Check if scheduled
+section.isScheduled()  # True if has meeting times
+```
+
+### Room Assignments
+
+Rooms are assigned via ResourceAssignments:
+
+```python
+# Get assigned classrooms
+section.classrooms()  # QuerySet of Resource objects
+section.prettyrooms() # List of room names
+
+# Assign a room
+section.assign_room(classroom_resource)
+
+# Clear room assignments
+section.clearRooms()
+```
+
+### Scheduling Status
+
+Check what's needed for a complete schedule:
+
+```python
+status = section.scheduling_status()
+# Returns:
+# - "Happy" - Fully scheduled with all resources
+# - "Needs time" - No meeting times assigned
+# - "Needs room" - Has times but no classroom
+# - "Needs resources" - Missing requested resources (projector, etc.)
+```
+
+## Student Enrollment
+
+### Getting Students
+
+```python
+# Students enrolled in a section
+section.students()           # Default: enrolled students
+section.students_prereg()    # All registration types
+section.num_students()       # Count of enrolled students
+
+# Students enrolled in any section of a class
+class_subject.students()     # Across all sections
+```
+
+### Registration Capacity
+
+```python
+# Check if section is full
+if section.isFull():
+    print("Section at capacity")
+
+# Check if specific student can add
+error = section.cannotAdd(student)
+if error:
+    print(f"Cannot add: {error}")
+else:
+    # Student can be added
+    pass
+```
+
+## Working with Classes
+
+### Finding Classes
+
+```python
+# All classes in a program
+program.classes()
+
+# Approved classes only
+ClassSubject.objects.filter(
+    parent_program=program,
+    status=ClassStatus.ACCEPTED
+)
+
+# Classes by teacher
+teacher.getTaughtClasses(program)
+
+# Classes by category
+ClassSubject.objects.filter(
+    parent_program=program,
+    category__symbol='M'  # Math classes
+)
+```
+
+### The Catalog
+
+Get the formatted class catalog:
+
+```python
+catalog = ClassSubject.objects.catalog(program)
+# Returns QuerySet with:
+# - Prefetched teachers
+# - Calculated enrollment counts
+# - Associated media
+# - Sorted by category and time
+
+for cls in catalog:
+    print(f"{cls.emailcode()}: {cls.title}")
+    print(f"  Teachers: {', '.join(t.name() for t in cls.get_teachers())}")
+    print(f"  Enrolled: {cls.num_students()}")
+```
+
+### Class Approval Workflow
+
+<Steps>
+  <Step title="Teacher Submits">
+    Teacher creates class with status = UNREVIEWED
+  </Step>
+  <Step title="Admin Reviews">
+    Admin views unreviewed classes in management interface
+  </Step>
+  <Step title="Admin Approves/Rejects">
+    Set status to ACCEPTED or REJECTED
+  </Step>
+  <Step title="Create Sections">
+    For accepted classes, create one or more sections
+  </Step>
+  <Step title="Schedule">
+    Assign meeting times and rooms to sections
+  </Step>
+  <Step title="Open to Students">
+    Students can now register for sections
+  </Step>
+</Steps>
+
+## Advanced Features
+
+### Class Flags
+
+Flags can be attached to classes for tagging:
+
+```python
+flag_type = ClassFlagType.objects.get(name="Hands-on")
+class_subject.class_flags.add(flag_type)
+
+# Find all hands-on classes
+ClassSubject.objects.filter(class_flags__name="Hands-on")
+```
+
+### Grade Range Exceptions
+
+Allow specific students outside the grade range:
+
+```python
+if program.useGradeRangeExceptions():
+    # Check if student has override permission
+    if student.hasGradeOverride(program):
+        # Allow registration despite grade restriction
+        pass
+```
+
+### Class Size Ranges
+
+Programs can define preferred class size ranges:
+
+```python
+class_subject.allowable_class_size_ranges.all()
+# Returns ClassSizeRange objects like:
+# - 5-10 students
+# - 11-20 students
+# - 21-30 students
+```
+
+### Moderators
+
+Sections can have moderators (teaching assistants):
+
+```python
+# Add moderator
+section.moderators.add(moderator_user)
+
+# Get all sections a user is moderating
+user.getModeratingSectionsFromProgram(program)
+```
+
+## Common Patterns
+
+### Creating a Complete Class
+
+```python
+def create_class_with_section(program, teacher, title, description):
+    """Create a class and its initial section."""
+    
+    # Create the class
+    cls = ClassSubject.objects.create(
+        parent_program=program,
+        title=title,
+        class_info=description,
+        category=ClassCategories.objects.get(symbol='S'),
+        grade_min=9,
+        grade_max=12,
+        duration=1.0,
+        class_size_max=25,
+        status=ClassStatus.UNREVIEWED
+    )
+    
+    # Add teacher
+    cls.teachers.add(teacher)
+    
+    # Create a section
+    section = ClassSection.objects.create(
+        parent_class=cls,
+        duration=1.0,
+        status=ClassStatus.UNREVIEWED
+    )
+    
+    return cls, section
+```
+
+### Checking Teacher Availability
+
+```python
+# Find times when all teachers are available
+section.viable_times()
+
+# Returns Event objects where all teachers indicated availability
+# and are not teaching other classes
+```
+
+### Finding Available Rooms
+
+```python
+# For a scheduled section, find rooms that fit
+viable_rooms = section.viable_rooms()
+# Returns rooms that:
+# - Are available at all meeting times
+# - Have sufficient capacity
+# - Satisfy resource requests (projector, etc.)
+```
+
+## Best Practices
+
+<Tip>
+  **Always create sections**: Even if a class only runs once, create a ClassSection. This maintains consistency in the data model.
+</Tip>
+
+<Warning>
+  **Don't delete sections with students**: Use `section.cancel()` instead to properly notify students and clear enrollments.
+</Warning>
+
+<Tip>
+  **Use email codes**: Reference classes by email code (H9876) rather than database ID in user-facing contexts.
+</Tip>
+
+## Examples from the Code
+
+From `esp/esp/program/models/class_.py`:
+
+```python
+# Get class capacity considering all factors
+def _get_capacity(self, ignore_changes=False):
+    ans = None
+    rooms = self.classrooms()
+    
+    if self.max_class_capacity is not None:
+        ans = self.max_class_capacity
+    else:
+        if len(rooms) == 0:
+            ans = self.parent_class.class_size_max
+        else:
+            class_max = self.parent_class.class_size_max
+            room_cap = self._get_room_capacity(rooms)
+            ans = min(class_max, room_cap) if class_max and room_cap else class_max or room_cap
+    
+    # Apply program-wide capacity adjustments
+    options = self.parent_program.studentclassregmoduleinfo
+    if not ignore_changes:
+        ans = int(ans * options.class_cap_multiplier + options.class_cap_offset)
+    
+    return int(ans) if ans else 0
+```

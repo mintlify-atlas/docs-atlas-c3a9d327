@@ -1,0 +1,696 @@
+---
+title: Admin Modules
+description: Program modules for program administration and management in ESP programs
+---
+
+## Overview
+
+Admin modules (`module_type="manage"`) provide tools for program directors and administrators to manage all aspects of a program. These modules appear in the admin interface at `/manage/<program>/` and require admin permissions to access.
+
+## Core Module
+
+### AdminCore
+
+**File**: `esp/esp/program/modules/handlers/admincore.py`
+
+**Purpose**: Provides the main program dashboard and core administrative functions.
+
+**Module Properties**:
+- Link Title: "Program Dashboard"
+- Module Type: "manage"
+- Seq: 0
+- Choosable: Yes
+
+**Key Features**:
+- Program dashboard with statistics
+- Deadline/permission management
+- Program settings configuration
+- Quick access to all admin modules
+- Statistics overview (students, teachers, classes)
+- Testing data cleanup
+
+**Main Views**:
+- `dashboard` - Main program dashboard
+- `deadlines` - Manage registration deadlines
+- `settings` - Program settings editor
+- `delete_test_data` - Remove test accounts
+- `newpermission` - Create custom permissions
+- `permissions_mgmt` - Permission management interface
+
+**Dashboard Statistics**:
+- Student registration numbers
+- Teacher registration numbers
+- Class statistics (submitted, approved, scheduled)
+- Resource usage
+- Capacity tracking
+
+## Class Management
+
+### AdminClass
+
+**File**: `esp/esp/program/modules/handlers/adminclass.py`
+
+**Purpose**: Comprehensive class management and bulk editing tools.
+
+**Module Properties**:
+- Admin Title: "Class Management for Admin"
+- Link Title: "Manage Classes"
+- Module Type: "manage"
+- Inline Template: "listclasses.html"
+- Seq: 1
+- Choosable: Yes
+
+**Key Features**:
+- Bulk class approval/rejection
+- Change class status (accepted, cancelled, etc.)
+- Bulk edit class properties
+- Assign rooms to multiple classes
+- Manage class flags
+- Export class data
+
+**Main Views**:
+- `manageclass` - Individual class management
+- `reviewclass` - Approve/reject classes
+- `bulkchangeclass` - Bulk edit multiple classes
+- `class_status` - View class status reports
+
+**Bulk Operations**:
+- Status changes (Cancelled, Rejected, Accepted, etc.)
+- Room assignments
+- Resource assignments
+- Grade range modifications
+- Duration changes
+
+### AdminReviewApps
+
+**File**: `esp/esp/program/modules/handlers/adminreviewapps.py`
+
+**Purpose**: Review student applications for admission to the program or specific classes.
+
+**Module Properties**:
+- Admin Title: "Application Review"
+- Link Title: "Review Applications"
+- Module Type: "manage"
+- Choosable: Yes
+
+### ClassFlagModule
+
+**File**: `esp/esp/program/modules/handlers/classflagmodule.py`
+
+**Purpose**: Tag classes with custom flags for organization and filtering.
+
+**Module Properties**:
+- Admin Title: "Class Flags"
+- Link Title: "Flag Classes"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- Create custom flag types
+- Apply flags to classes
+- Filter by flags
+- Bulk flag operations
+
+### ClassSearchModule
+
+**File**: `esp/esp/program/modules/handlers/classsearchmodule.py`
+
+**Purpose**: Advanced search and filtering for classes.
+
+**Module Properties**:
+- Admin Title: "Class Search"
+- Link Title: "Search Classes"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Search Criteria**:
+- Teacher name
+- Class title/description
+- Status
+- Grade range
+- Category
+- Resources
+- Scheduling status
+
+## Scheduling Modules
+
+### AJAXSchedulingModule
+
+**File**: `esp/esp/program/modules/handlers/ajaxschedulingmodule.py`
+
+**Purpose**: Interactive drag-and-drop scheduling interface.
+
+**Module Properties**:
+- Link Title: "AJAX Scheduling"
+- Module Type: "manage"
+- Seq: 7
+- Choosable: Yes
+
+**Key Features**:
+- Drag-and-drop class scheduling
+- Real-time conflict detection
+- Room capacity checking
+- Teacher availability verification
+- Resource availability checking
+- Multi-user collaboration (change log)
+- Schedule comments and locking
+
+**Main Views**:
+- `ajax_scheduling` - Main scheduling interface
+- `ajax_schedule_class` - Schedule a single class
+- `ajax_change_log` - View scheduling changes
+
+### AutoschedulerFrontendModule
+
+**File**: `esp/esp/program/modules/handlers/autoschedulerfrontendmodule.py`
+
+**Purpose**: Interface to the automated scheduling algorithm.
+
+**Module Properties**:
+- Admin Title: "Automatic Scheduler"
+- Link Title: "Automatic Scheduler"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- Configure scheduling constraints
+- Run automated scheduling
+- Review suggested schedules
+- Apply or reject suggestions
+
+### SchedulingCheckModule
+
+**File**: `esp/esp/program/modules/handlers/schedulingcheckmodule.py`
+
+**Purpose**: Validate and check for scheduling conflicts.
+
+**Module Properties**:
+- Admin Title: "Scheduling Diagnostics"
+- Link Title: "Check Schedule"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Checks**:
+- Teacher conflicts (teaching multiple classes at once)
+- Room conflicts (double-booked rooms)
+- Student conflicts
+- Resource conflicts
+- Lunch/break validation
+
+## Resource Management
+
+### ResourceModule
+
+**File**: `esp/esp/program/modules/handlers/resourcemodule.py`
+
+**Purpose**: Manage classrooms and resources (projectors, whiteboards, etc.).
+
+**Module Properties**:
+- Admin Title: "Resources"
+- Link Title: "Manage Resources"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Key Features**:
+- Create/edit classrooms
+- Define resource types (projectors, computers, etc.)
+- Assign resources to rooms
+- View resource requests from teachers
+- Assign requested resources
+- Resource availability by timeslot
+
+**Main Views**:
+- `resources` - Main resource management
+- `resource_timeslots` - Resource availability by time
+- `assign_resources` - Fulfill teacher requests
+
+### AdminMaterials
+
+**File**: `esp/esp/program/modules/handlers/adminmaterials.py`
+
+**Purpose**: Track and manage materials provided to teachers.
+
+**Module Properties**:
+- Admin Title: "Materials Tracking"
+- Link Title: "Track Materials"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Communication Modules
+
+### CommModule
+
+**File**: `esp/esp/program/modules/handlers/commmodule.py`
+
+**Purpose**: Send emails to program participants based on flexible criteria.
+
+**Module Properties**:
+- Admin Title: "Communications Panel"
+- Link Title: "Send Email"
+- Module Type: "manage"
+- Seq: 3
+- Choosable: Yes
+
+**Key Features**:
+- Select recipients by multiple criteria:
+  - Registration status
+  - Classes enrolled/taught
+  - Grade level
+  - Geographic location
+  - Custom queries
+- Email templates
+- HTML and plain text
+- CC and BCC support
+- Email preview
+- Send test emails
+
+**User Selection Criteria**:
+- Students: confirmed, enrolled, waitlisted, by grade, etc.
+- Teachers: with classes, by approval status, etc.
+- Volunteers
+- Custom filters
+
+### GroupTextModule
+
+**File**: `esp/esp/program/modules/handlers/grouptextmodule.py`
+
+**Purpose**: Send SMS/text messages to groups of users.
+
+**Module Properties**:
+- Admin Title: "Group Texting"
+- Link Title: "Send Text Messages"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Reports and Lists
+
+### ListGenModule
+
+**File**: `esp/esp/program/modules/handlers/listgenmodule.py`
+
+**Purpose**: Generate lists and reports of program participants.
+
+**Module Properties**:
+- Admin Title: "Generate Lists"
+- Link Title: "Lists"
+- Module Type: "manage"
+- Seq: 4
+- Choosable: Yes
+
+**Available Lists**:
+- Student lists (confirmed, enrolled, by class, etc.)
+- Teacher lists (with classes, by status, etc.)
+- Volunteer lists
+- Custom filtered lists
+- Export to CSV/Excel
+
+### ProgramPrintables
+
+**File**: `esp/esp/program/modules/handlers/programprintables.py`
+
+**Purpose**: Generate a wide variety of printable documents for program operation.
+
+**Module Properties**:
+- Link Title: "Program Printables"
+- Module Type: "manage"
+- Seq: 5
+- Choosable: Yes
+
+**Available Printables**:
+- Class rosters
+- Student schedules
+- Teacher schedules
+- Room schedules
+- Attendance sheets
+- Nametags
+- Catalog
+- Certificate
+- Checklists
+- Student labels
+- Many more...
+
+### NameTagModule
+
+**File**: `esp/esp/program/modules/handlers/nametagmodule.py`
+
+**Purpose**: Generate customizable name tags.
+
+**Module Properties**:
+- Admin Title: "Name Tags"
+- Link Title: "Name Tags"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- Multiple name tag formats
+- Custom fields (name, school, grade, etc.)
+- Barcode generation
+- PDF output
+
+### MailingLabels
+
+**File**: `esp/esp/program/modules/handlers/mailinglabels.py`
+
+**Purpose**: Generate mailing labels for participants.
+
+**Module Properties**:
+- Admin Title: "Mailing Labels"
+- Link Title: "Mailing Labels"
+- Module Type: "manage"
+- Choosable: Yes
+
+## User Management
+
+### AdminMorph
+
+**File**: `esp/esp/program/modules/handlers/adminmorph.py`
+
+**Purpose**: Morph into another user's account for testing and support.
+
+**Module Properties**:
+- Admin Title: "User Morphing Capability"
+- Link Title: "Morph into User"
+- Module Type: "manage"
+- Seq: 34
+- Choosable: Yes
+
+**Features**:
+- Search for any user
+- Pre-filtered searches (students, teachers, volunteers)
+- Morph into their account
+- See what they see
+- Test registration flows
+- Switch back to admin account
+
+**Use Cases**:
+- Testing user experience
+- Troubleshooting registration issues
+- Demonstrating features
+
+### BulkCreateAccountModule
+
+**File**: `esp/esp/program/modules/handlers/bulkcreateaccountmodule.py`
+
+**Purpose**: Create multiple user accounts from a CSV file.
+
+**Module Properties**:
+- Admin Title: "Bulk Account Creation"
+- Link Title: "Create Accounts"
+- Module Type: "manage"
+- Choosable: Yes
+
+### UserGroupModule
+
+**File**: `esp/esp/program/modules/handlers/usergroupmodule.py`
+
+**Purpose**: Manage user groups and roles.
+
+**Module Properties**:
+- Admin Title: "User Groups"
+- Link Title: "User Groups"
+- Module Type: "manage"
+- Choosable: Yes
+
+### UserRecordsModule
+
+**File**: `esp/esp/program/modules/handlers/userrecordsmodule.py`
+
+**Purpose**: View and manage user records (bits) for the program.
+
+**Module Properties**:
+- Admin Title: "User Records"
+- Link Title: "User Records"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Financial Modules
+
+### LineItemsModule
+
+**File**: `esp/esp/program/modules/handlers/lineitemsmodule.py`
+
+**Purpose**: Configure program costs and optional items.
+
+**Module Properties**:
+- Admin Title: "Line Items"
+- Link Title: "Manage Costs"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- Set base program fee
+- Create optional items (meals, t-shirts, etc.)
+- Set prices and availability
+- Define financial aid line items
+
+### AccountingModule
+
+**File**: `esp/esp/program/modules/handlers/accountingmodule.py`
+
+**Purpose**: View and manage program finances and payments.
+
+**Module Properties**:
+- Admin Title: "Accounting"
+- Link Title: "Accounting"
+- Module Type: "manage"
+- Choosable: Yes
+
+### FinAidApproveModule
+
+**File**: `esp/esp/program/modules/handlers/finaidapprovemodule.py`
+
+**Purpose**: Review and approve financial aid applications.
+
+**Module Properties**:
+- Admin Title: "Financial Aid Approval"
+- Link Title: "Approve Financial Aid"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- View applications
+- Approve/deny requests
+- Set award amounts
+- Send notifications
+
+### CreditCardViewer
+
+**File**: `esp/esp/program/modules/handlers/creditcardviewer.py`
+
+**Purpose**: View credit card payment information.
+
+**Module Properties**:
+- Admin Title: "Credit Card Viewer"
+- Link Title: "View Payments"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Volunteer Management
+
+### VolunteerManage
+
+**File**: `esp/esp/program/modules/handlers/volunteermanage.py`
+
+**Purpose**: Manage volunteer registrations and assignments.
+
+**Module Properties**:
+- Admin Title: "Volunteer Management"
+- Link Title: "Manage Volunteers"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Survey Management
+
+### SurveyManagement
+
+**File**: `esp/esp/program/modules/handlers/surveymanagement.py`
+
+**Purpose**: Create and manage surveys for students and teachers.
+
+**Module Properties**:
+- Admin Title: "Survey Management"
+- Link Title: "Manage Surveys"
+- Module Type: "manage"
+- Choosable: Yes
+
+**Features**:
+- Create surveys
+- Define questions
+- Per-class or per-program surveys
+- View responses
+- Export results
+
+## Display Modules
+
+### BigBoardModule
+
+**File**: `esp/esp/program/modules/handlers/bigboardmodule.py`
+
+**Purpose**: Large display board for program status and announcements.
+
+**Module Properties**:
+- Admin Title: "Big Board"
+- Link Title: "Big Board"
+- Module Type: "manage"
+- Choosable: Yes
+
+### AdmissionsDashboard
+
+**File**: `esp/esp/program/modules/handlers/admissionsdashboard.py`
+
+**Purpose**: Real-time dashboard for program admissions and registration.
+
+**Module Properties**:
+- Admin Title: "Admissions Dashboard"
+- Link Title: "Admissions"
+- Module Type: "manage"
+- Choosable: Yes
+
+### AdminVitals
+
+**File**: `esp/esp/program/modules/handlers/adminvitals.py`
+
+**Purpose**: Quick view of vital program statistics.
+
+**Module Properties**:
+- Admin Title: "Program Vitals"
+- Link Title: "Vitals"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Testing and Development
+
+### AdminTestingModule
+
+**File**: `esp/esp/program/modules/handlers/admintestingmodule.py`
+
+**Purpose**: Tools for testing program functionality.
+
+**Module Properties**:
+- Admin Title: "Testing Tools"
+- Link Title: "Testing"
+- Module Type: "manage"
+- Choosable: Yes
+
+### DeactivationModule
+
+**File**: `esp/esp/program/modules/handlers/deactivationmodule.py`
+
+**Purpose**: Deactivate or archive old programs.
+
+**Module Properties**:
+- Admin Title: "Program Deactivation"
+- Link Title: "Deactivate"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Specialized Modules
+
+### ClassChangeRequestModule
+
+**File**: `esp/esp/program/modules/handlers/classchangerequestmodule.py`
+
+**Purpose**: Manage requests from teachers to change their classes.
+
+**Module Properties**:
+- Admin Title: "Class Change Requests"
+- Link Title: "Class Changes"
+- Module Type: "manage"
+- Choosable: Yes
+
+### CheckAvailabilityModule
+
+**File**: `esp/esp/program/modules/handlers/checkavailabilitymodule.py`
+
+**Purpose**: Bulk check teacher availability.
+
+**Module Properties**:
+- Admin Title: "Check Availability"
+- Link Title: "Check Teacher Availability"
+- Module Type: "manage"
+- Choosable: Yes
+
+### TeacherEventsManageModule
+
+**File**: `esp/esp/program/modules/handlers/teachereventsmanagemodule.py`
+
+**Purpose**: Manage teacher training events and interviews.
+
+**Module Properties**:
+- Admin Title: "Teacher Events Management"
+- Link Title: "Manage Teacher Events"
+- Module Type: "manage"
+- Choosable: Yes
+
+### MapGenModule
+
+**File**: `esp/esp/program/modules/handlers/mapgenmodule.py`
+
+**Purpose**: Generate maps showing program participant locations.
+
+**Module Properties**:
+- Admin Title: "Map Generation"
+- Link Title: "Generate Maps"
+- Module Type: "manage"
+- Choosable: Yes
+
+### JSONDataModule
+
+**File**: `esp/esp/program/modules/handlers/jsondatamodule.py`
+
+**Purpose**: Provide JSON API endpoints for program data.
+
+**Module Properties**:
+- Admin Title: "JSON Data API"
+- Link Title: "JSON Data"
+- Module Type: "json"
+- Choosable: Yes
+
+**Features**:
+- Export data in JSON format
+- API endpoints for integration
+- Used by mobile apps and external tools
+
+## Development Notes
+
+### Creating a Custom Admin Module
+
+```python
+from esp.program.modules.base import ProgramModuleObj, needs_admin, main_call
+from esp.utils.web import render_to_response
+
+class MyAdminModule(ProgramModuleObj):
+    doc = """Description of administrative functionality."""
+    
+    @classmethod
+    def module_properties(cls):
+        return {
+            "admin_title": "My Admin Tool",
+            "link_title": "My Tool",
+            "module_type": "manage",
+            "seq": 50,
+            "choosable": 1,
+        }
+    
+    @main_call
+    @needs_admin
+    def mytool(self, request, tl, one, two, module, extra, prog):
+        context = {'program': prog}
+        # Add your admin logic here
+        return render_to_response(self.baseDir() + 'main.html', request, context)
+```
+
+### Admin Module Best Practices
+
+1. **Always use `@needs_admin`**: Protect admin views with the decorator
+2. **Provide clear documentation**: Use the `doc` attribute to explain what the module does
+3. **Handle bulk operations carefully**: Validate before making mass changes
+4. **Log important actions**: Use Django logging for administrative actions
+5. **Provide confirmation**: Ask for confirmation before destructive operations
+
+## See Also
+
+- [Program Modules Overview](/api/modules/overview)
+- [Student Modules](/api/modules/student)
+- [Teacher Modules](/api/modules/teacher)
+- [Onsite Modules](/api/modules/onsite)

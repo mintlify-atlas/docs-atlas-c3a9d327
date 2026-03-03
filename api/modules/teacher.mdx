@@ -1,0 +1,446 @@
+---
+title: Teacher Modules
+description: Program modules for teacher registration and class management in ESP programs
+---
+
+## Overview
+
+Teacher modules (`module_type="teach"`) handle all aspects of the teacher experience, from profile setup through class creation, roster management, and post-program activities. These modules appear in the teacher registration interface at `/teach/<program>/`.
+
+## Core Module
+
+### TeacherRegCore
+
+**File**: `esp/esp/program/modules/handlers/teacherregcore.py`
+
+**Purpose**: Serves the main teacher registration page that aggregates all teacher registration steps.
+
+**Module Properties**:
+- Admin Title: "Core Teacher Registration"
+- Link Title: "Teacher Registration"
+- Module Type: "teach"
+- Seq: -9999 (displayed first)
+- Choosable: Yes
+
+**Key Features**:
+- Displays all enabled teacher modules as steps
+- Enforces required module completion
+- Shows progress indicators
+- Links to class management
+
+**Main Views**:
+- `teacherreg` - Main registration page showing all steps
+
+**Implementation**: Similar to StudentRegCore but for teachers. Integrates with `ClassRegModuleInfo` for settings.
+
+## Required Modules
+
+### RegProfileModule
+
+**File**: `esp/esp/program/modules/handlers/regprofilemodule.py`
+
+**Purpose**: Allows teachers to update their profile information for a specific program.
+
+**Module Properties**:
+- Admin Title: "Teacher Profile Editor"
+- Link Title: "Update Your Profile"
+- Module Type: "teach"
+- Required: Yes
+- Seq: 0 (first step)
+
+**Features**:
+- Contact information editing
+- Teaching experience
+- Availability for programs
+
+**User Tracking**:
+- `teacher_profile`: Teachers who have filled out a profile
+
+### TeacherBioModule
+
+**File**: `esp/esp/program/modules/handlers/teacherbiomodule.py`
+
+**Purpose**: Allows teachers to create or edit their biography for display in the class catalog.
+
+**Module Properties**:
+- Admin Title: "Teacher Biography Editor"
+- Link Title: "Update your teacher biography"
+- Module Type: "teach"
+- Seq: -111
+- Choosable: Yes
+
+**Features**:
+- Rich text biography editor
+- Biography appears in class catalog
+- Per-program customization
+- URL slug generation
+
+**User Tracking**:
+- `teacher_biographies`: Teachers who have completed their biography
+
+**Completion**: Marked complete when teacher has both a bio and slug.
+
+### TeacherAcknowledgementModule
+
+**File**: `esp/esp/program/modules/handlers/teacheracknowledgementmodule.py`
+
+**Purpose**: Requires teachers to acknowledge and agree to program policies and expectations.
+
+**Module Properties**:
+- Admin Title: "Teacher Acknowledgement"
+- Link Title: "Teacher Acknowledgement"
+- Module Type: "teach"
+- Choosable: No (must be manually added)
+
+**Features**:
+- Customizable agreement text
+- Checkbox confirmation required
+- Records acknowledgement
+
+## Class Management Modules
+
+### TeacherClassRegModule
+
+**File**: `esp/esp/program/modules/handlers/teacherclassregmodule.py`
+
+**Purpose**: The primary module for teachers to register and manage their classes.
+
+**Module Properties**:
+- Admin Title: "Teacher Class Registration"
+- Link Title: "Register Your Classes"
+- Module Type: "teach"
+- Seq: 10
+- Inline Template: "listclasses.html"
+- Choosable: Yes
+
+**Key Features**:
+- Create new classes
+- Edit existing classes
+- Manage multiple sections
+- Set class capacity, grades, prerequisites
+- Request resources (projectors, whiteboards, etc.)
+- Add/remove co-teachers
+- View enrolled students
+- Cancel classes or request cancellation
+- Application question setup
+- Open class registration
+
+**Main Views**:
+- `listclasses` - Inline list of teacher's classes
+- `makeaclass` - Create a new class
+- `editclass` - Edit an existing class
+- `manageclass` - Detailed class management interface
+- `addsection` - Add a section to a class
+- `delsection` - Remove a section
+- `teacherlookup` - Search for co-teachers
+- `cancelclass` - Cancel a class or section
+- `reviewstudentapps` - Review student applications
+- `survey_results` - View class surveys
+
+**Settings** (via `ClassRegModuleInfo`):
+- `allow_coteach`: Enable co-teaching
+- `set_prereqs`: Allow prerequisite specification
+- `class_max_duration`: Maximum class length in minutes
+- `class_min_cap`, `class_max_size`: Class size constraints
+- `allowed_sections`: Number of sections allowed
+- `num_teacher_questions`: Max application questions
+- `color_code`: Custom color for classes
+- `allow_lateness`: Allow students to arrive late
+- `ask_for_room`: Request specific rooms
+- `open_class_registration`: Enable open class option
+
+**User Tracking**:
+- `class_submitted`: Teachers with at least one class
+- `class_approved`: Teachers with approved classes
+- `class_rejected`: Teachers with rejected classes
+
+### TeacherModeratorModule
+
+**File**: `esp/esp/program/modules/handlers/teachermoderatormodule.py`
+
+**Purpose**: Allows teachers to sign up as moderators for other teachers' classes.
+
+**Module Properties**:
+- Admin Title: "Teacher Moderator Registration"
+- Link Title: "Moderate Classes"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- Browse classes needing moderators
+- Sign up to moderate
+- View moderation schedule
+
+## Availability and Scheduling
+
+### AvailabilityModule
+
+**File**: `esp/esp/program/modules/handlers/availabilitymodule.py`
+
+**Purpose**: Allows teachers to indicate when they are available to teach during the program.
+
+**Module Properties**:
+- Admin Title: "Teacher Availability"
+- Link Title: "Indicate Your Availability"
+- Module Type: "teach"
+- Seq: 0
+- Choosable: Yes
+
+**Key Features**:
+- Calendar interface to select available times
+- Required before class registration
+- Helps with automated scheduling
+- Can import from other programs
+
+**Main Views**:
+- `availability` - Set availability
+- `availability_post` - Save availability
+
+**User Tracking**:
+- `availability_available`: Teachers who completed availability
+
+### TeacherEventsModule
+
+**File**: `esp/esp/program/modules/handlers/teachereventsmodule.py`
+
+**Purpose**: Allows teachers to sign up for special teacher events (training, interviews, etc.).
+
+**Module Properties**:
+- Admin Title: "Teacher Event Sign-up"
+- Link Title: "Sign Up for Teacher Events"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- Register for teacher training sessions
+- Sign up for interviews
+- Capacity management
+
+## Class Preview and Applications
+
+### TeacherPreviewModule
+
+**File**: `esp/esp/program/modules/handlers/teacherpreviewmodule.py`
+
+**Purpose**: Allows teachers to preview what their class will look like in the catalog.
+
+**Module Properties**:
+- Admin Title: "Teacher Class Preview"
+- Link Title: "Preview Your Classes"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- See catalog view of classes
+- Preview before approval
+- Check formatting and display
+
+### TeacherReviewApps
+
+**File**: `esp/esp/program/modules/handlers/teacherreviewapps.py`
+
+**Purpose**: Interface for teachers to review student applications for their classes.
+
+**Module Properties**:
+- Admin Title: "Teacher Review Applications"
+- Link Title: "Review Student Applications"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- View student applications
+- Approve/reject students
+- Leave comments
+- Email applicants
+
+## Quiz and Assessment
+
+### TeacherQuizModule
+
+**File**: `esp/esp/program/modules/handlers/teacherquizmodule.py`
+
+**Purpose**: Administers a quiz that teachers must pass before registering classes.
+
+**Module Properties**:
+- Admin Title: "Teacher Quiz"
+- Link Title: "Teacher Training Quiz"
+- Module Type: "teach"
+- Required: Yes (configurable)
+- Choosable: Yes
+
+**Features**:
+- Multiple choice questions
+- Required passing score
+- Blocks class registration until passed
+- Retake capability
+
+**User Tracking**:
+- `quiz_done`: Teachers who passed the quiz
+
+## Onsite Teacher Modules
+
+### TeacherOnsite
+
+**File**: `esp/esp/program/modules/handlers/teacheronsite.py`
+
+**Purpose**: Teacher-facing onsite module for viewing schedule and class rosters.
+
+**Module Properties**:
+- Admin Title: "Teacher Onsite"
+- Link Title: "Onsite Info"
+- Module Type: "teach"
+- Choosable: Yes
+
+### TeacherCheckinModule
+
+**File**: `esp/esp/program/modules/handlers/teachercheckinmodule.py`
+
+**Purpose**: Check in teachers when they arrive at the program.
+
+**Module Properties**:
+- Admin Title: "Teacher Check-In"
+- Link Title: "Check in teachers"
+- Module Type: "onsite"
+- Seq: 10
+- Choosable: Yes
+
+**Features**:
+- Barcode scanning
+- Manual search and check-in
+- Attendance tracking
+- Class roster access
+
+## Communication and Display
+
+### TeacherBigBoardModule
+
+**File**: `esp/esp/program/modules/handlers/teacherbigboardmodule.py`
+
+**Purpose**: Displays a big board showing teacher assignments and classroom information.
+
+**Module Properties**:
+- Admin Title: "Teacher Big Board"
+- Link Title: "Teacher Big Board"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- Large display of teaching schedule
+- Room assignments
+- Real-time updates
+- Suitable for projection
+
+## Survey Modules
+
+### TeacherSurveyModule
+
+**File**: `esp/esp/program/modules/handlers/teachersurveymodule.py`
+
+**Purpose**: Post-program surveys for teachers.
+
+**Module Properties**:
+- Admin Title: "Teacher Survey"
+- Link Title: "Teacher Survey"
+- Module Type: "teach"
+- Choosable: No
+
+## Custom Form Modules
+
+### TeacherCustomFormModule
+
+**File**: `esp/esp/program/modules/handlers/teachercustomformmodule.py`
+
+**Purpose**: Generic custom form handler for program-specific teacher data collection.
+
+**Module Properties**:
+- Admin Title: "Teacher Custom Form"
+- Link Title: "Custom Form"
+- Module Type: "teach"
+- Choosable: Yes
+
+**Features**:
+- Configurable form fields
+- Custom validation
+- Data export
+
+## Development Notes
+
+### Creating a Custom Teacher Module
+
+To create a new teacher module:
+
+1. Create a new file in `esp/esp/program/modules/handlers/`
+2. Inherit from `ProgramModuleObj`
+3. Set `module_type = "teach"`
+4. Implement required methods:
+
+```python
+from esp.program.modules.base import ProgramModuleObj, needs_teacher, main_call
+
+class MyTeacherModule(ProgramModuleObj):
+    doc = """Description of module purpose."""
+    
+    @classmethod
+    def module_properties(cls):
+        return {
+            "admin_title": "My Teacher Module",
+            "link_title": "My Module",
+            "module_type": "teach",
+            "seq": 50,
+            "choosable": 1,
+        }
+    
+    @main_call
+    @needs_teacher
+    @meets_deadline('/MyDeadline')
+    def myview(self, request, tl, one, two, module, extra, prog):
+        # Implementation
+        pass
+```
+
+### Common Teacher Module Patterns
+
+#### Tracking Teachers Who Completed a Task
+
+```python
+def teachers(self, QObject=False):
+    q = Q(teacherbio__program=self.program)
+    if QObject:
+        return {'teacher_biographies': q}
+    return {'teacher_biographies': ESPUser.objects.filter(q).distinct()}
+
+def teacherDesc(self):
+    return {'teacher_biographies': "Teachers who completed their bio"}
+```
+
+#### Checking Module Completion
+
+```python
+def isCompleted(self):
+    user = get_current_request().user
+    # Check if teacher completed the required task
+    return TeacherBio.objects.filter(
+        user=user,
+        program=self.program
+    ).exists()
+```
+
+### Integration with Class Management
+
+Many teacher modules interact with the class system:
+
+```python
+def prepare(self, context):
+    """Add data to teacher registration page."""
+    user = get_current_request().user
+    context['teacher_classes'] = user.getTaughtClasses(self.program)
+    context['can_edit'] = self.deadline_met('/Classes/Edit')
+    return context
+```
+
+## See Also
+
+- [Program Modules Overview](/api/modules/overview)
+- [Student Modules](/api/modules/student)
+- [Admin Modules](/api/modules/admin)
+- [Onsite Modules](/api/modules/onsite)

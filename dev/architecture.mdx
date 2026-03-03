@@ -1,0 +1,383 @@
+---
+title: Architecture overview
+description: Understanding the ESP Website architecture and technology stack
+---
+
+## Overview
+
+ESP Website is a Django-based web application designed to manage large-scale educational programs. The platform supports multiple concurrent programs, each with customizable workflows for student registration, teacher class submission, and onsite operations.
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Backend" icon="server">
+    - **Framework**: Django 2.2
+    - **Language**: Python 3.7
+    - **Database**: PostgreSQL 14
+    - **Cache**: Memcached with pylibmc
+    - **Task Queue**: Custom email queue system
+  </Card>
+  
+  <Card title="Frontend" icon="window">
+    - **Templates**: Django templates with custom tags
+    - **JavaScript**: jQuery and custom scripts
+    - **CSS**: Less stylesheets with theme system
+    - **Admin UI**: django-admin-tools
+  </Card>
+  
+  <Card title="Infrastructure" icon="cloud">
+    - **Web Server**: Apache with mod_wsgi (production)
+    - **Development**: Docker Compose
+    - **Email**: Exim4 + dbmail queue system
+    - **File Storage**: Local filesystem
+  </Card>
+  
+  <Card title="Integrations" icon="plug">
+    - **Payments**: Stripe, CyberSource
+    - **SMS**: Twilio
+    - **Email**: SendGrid (optional)
+    - **Forms**: Formstack integration
+    - **Mailing Lists**: Mailman
+  </Card>
+</CardGroup>
+
+## System Architecture
+
+### Request Flow
+
+```
+User Request
+    ↓
+Apache / Docker (Web Server)
+    ↓
+WSGI Application (esp.wsgi)
+    ↓
+Django URL Router (esp/esp/urls.py)
+    ↓
+┌─────────────────────────────────┐
+│  Program Module System          │
+│  (StudentRegCore, TeacherRegCore, etc.) │
+└─────────────────────────────────┘
+    ↓
+View Functions / Classes
+    ↓
+Models + Database Queries
+    ↓
+┌─────────────┬─────────────┐
+│ PostgreSQL  │ Memcached   │
+│ (persistent)│ (cache)     │
+└─────────────┴─────────────┘
+    ↓
+Template Rendering
+    ↓
+HTML Response
+```
+
+### Database Architecture
+
+The database uses Django ORM with several key patterns:
+
+**Core Models**:
+- `Program` - Represents a program instance (e.g., "Splash Fall 2024")
+- `ClassSubject` - A class offering with title, description, teachers
+- `ClassSection` - Scheduled instance of a class with time and room
+- `ESPUser` - Extended user model with student/teacher capabilities
+- `StudentRegistration` - Tracks student enrollment and interest
+
+**Architectural Patterns**:
+
+<AccordionGroup>
+  <Accordion title="ExpirableModel Pattern">
+    Many models inherit from `ExpirableModel` which adds `start_date` and `end_date` fields. This allows tracking historical data:
+    
+    ```python
+    # From esp/esp/db/models.py
+    class ExpirableModel(models.Model):
+        start_date = models.DateTimeField(default=datetime.now)
+        end_date = models.DateTimeField(default=datetime.max)
+        
+        def expire(self):
+            self.end_date = datetime.now()
+            self.save()
+    ```
+    
+    Used by: `StudentRegistration`, `Permission`, `Record`, and many others.
+  </Accordion>
+  
+  <Accordion title="ArgCache Caching">
+    The custom `argcache` library provides function-level caching with automatic invalidation:
+    
+    ```python
+    from argcache import cache_function
+    
+    @cache_function
+    def expensive_query(program_id):
+        # Results are cached by arguments
+        return Program.objects.get(id=program_id)
+    ```
+    
+    See the [Cache documentation](/dev/cache) for details.
+  </Accordion>
+  
+  <Accordion title="Tag System">
+    The `Tag` model provides flexible key-value configuration that can be global or scoped to specific objects (usually Programs):
+    
+    ```python
+    # Get a program-specific setting
+    student_reg_start = Tag.getProgramTag('student_reg_start', program)
+    
+    # Set a boolean flag
+    Tag.setTag('require_guardian_email', program, value='True')
+    ```
+    
+    See the [Tags documentation](/dev/tags) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Program Module System
+
+The defining architectural feature of ESP Website is its **modular program system**. Programs are composed of independent modules that handle different aspects of registration and management.
+
+### Module Architecture
+
+```
+ProgramModuleObj (Database Record)
+    ↓
+Module Handler Class (Python)
+    ↓
+Views (URL endpoints)
+    ↓
+Templates (User interface)
+```
+
+**Key Components**:
+
+1. **Base Classes** (`esp/esp/program/modules/base.py`):
+   - `ProgramModuleObj` - Database model linking modules to programs
+   - `CoreModule` - Abstract base class for all modules
+
+2. **Module Types**:
+   - `learn` - Student-facing modules (registration, profile, etc.)
+   - `teach` - Teacher-facing modules (class creation, availability, etc.)
+   - `manage` - Admin modules (scheduling, reports, communications)
+   - `onsite` - Day-of operations (check-in, attendance)
+   - `volunteer` - Volunteer recruitment and management
+   - `json` - API endpoints
+
+3. **URL Routing**:
+   ```
+   /learn/Splash/2024/studentreg/
+   /{module_type}/{program}/{instance}/{view}/
+   ```
+
+### Module Lifecycle
+
+<Steps>
+  <Step title="Module Selection">
+    Administrators select which modules to enable for a program via the Django admin or program creation form.
+  </Step>
+  
+  <Step title="Module Initialization">
+    When a URL is accessed, Django loads the appropriate module handler class and calls its view method.
+  </Step>
+  
+  <Step title="Permission Check">
+    Modules use decorators like `@needs_student` or `@needs_admin` to enforce access control.
+  </Step>
+  
+  <Step title="View Execution">
+    The view method processes the request, queries the database, and returns a response.
+  </Step>
+  
+  <Step title="Template Rendering">
+    The response is rendered using Django templates, which can include QSD (admin-editable) content.
+  </Step>
+</Steps>
+
+See the [Program Modules documentation](/dev/program-modules) for implementation details.
+
+## Email System Architecture
+
+ESP Website includes a sophisticated email queuing system:
+
+```
+Send Request (send_mail)
+    ↓
+MessageRequest (database)
+    ↓
+TextOfEmail (database)
+    ↓
+Email Queue Daemon (dbmail_cron.py)
+    ↓
+SMTP Server (Exim4 / SendGrid)
+    ↓
+Recipients
+```
+
+**Key Features**:
+- All emails queued in database before sending
+- Template system with variable substitution
+- HTML and plain text versions
+- Recipient lists (students, teachers, filtered users)
+- Unsubscribe handling
+- Send-to-guardians for minor students
+
+See the [Email documentation](/dev/email) for details.
+
+## Template System
+
+ESP Website uses a hierarchical template system:
+
+### Template Inheritance
+
+```
+main.html (base template)
+    ↓
+program/base.html (program-specific)
+    ↓
+program/modules/studentregcore/student_reg.html (module template)
+```
+
+### QSD (Quasi-Static Data)
+
+Administrators can edit page content without code changes:
+
+```django
+{% load render_qsd %}
+{% render_inline_qsd qsd_name %}
+```
+
+QSD content is stored in the database and cached.
+
+### Template Overrides
+
+The `TemplateOverride` model allows per-program customization of templates without modifying the codebase.
+
+## Caching Strategy
+
+<CardGroup cols={2}>
+  <Card title="ArgCache (Application Level)" icon="database">
+    Function-level caching with automatic invalidation based on model changes.
+    
+    **Usage**: Expensive queries, permission checks, user lists
+  </Card>
+  
+  <Card title="Memcached (Session Level)" icon="bolt">
+    Django's cache framework for session data and template fragments.
+    
+    **Usage**: User sessions, rendered template blocks
+  </Card>
+</CardGroup>
+
+**Cache Invalidation**:
+- ArgCache uses "wildcard" tokens to invalidate groups of related data
+- Model signal handlers trigger invalidation on save/delete
+- Manual cache clearing available via management commands
+
+## Security Model
+
+### Permission System
+
+The `Permission` model provides fine-grained access control:
+
+```python
+from esp.users.models import Permission
+
+# Check if user can administer a program
+if Permission.user_has_perm(user, 'V/Administer', program):
+    # Allow access
+```
+
+**Permission Types**:
+- `V/Administer` - Full program administration
+- `V/Administer/Edit` - Edit program settings
+- `V/Flags/UserRole/{Student,Teacher,etc}` - User type roles
+
+### View Decorators
+
+```python
+from esp.program.modules.base import needs_admin, needs_student
+
+@needs_admin
+def admin_view(request, *args, **kwargs):
+    # Only administrators can access
+```
+
+## File Organization
+
+See the [Directory Structure](/dev/directory-structure) page for a complete guide to the codebase layout.
+
+## Deployment Architecture
+
+**Production Setup**:
+```
+Apache (mod_wsgi)
+    ↓
+Multiple WSGI Processes
+    ↓
+PostgreSQL (persistent data)
+    ↓
+Memcached (cache)
+    ↓
+Exim4 (email delivery)
+```
+
+**Development Setup**:
+```
+Docker Compose
+    ↓
+┌────────────┬─────────────┬──────────────┐
+│ web        │ db          │ memcached    │
+│ (Django)   │ (Postgres)  │              │
+└────────────┴─────────────┴──────────────┘
+```
+
+See the [Deploying documentation](/dev/deploying) for production setup details.
+
+## Development Workflow
+
+<Steps>
+  <Step title="Clone Repository">
+    Clone the ESP-Website repository from GitHub.
+  </Step>
+  
+  <Step title="Start Docker Environment">
+    Run `docker compose up --build` to start the development server.
+  </Step>
+  
+  <Step title="Access Development Server">
+    Navigate to http://localhost:8000 in your browser.
+  </Step>
+  
+  <Step title="Create Superuser">
+    Run `docker compose exec web python esp/manage.py createsuperuser` to create an admin account.
+  </Step>
+  
+  <Step title="Make Changes">
+    Edit code in your working directory. Changes are reflected immediately.
+  </Step>
+  
+  <Step title="Run Tests">
+    Run `docker compose exec web python esp/manage.py test` before committing.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Directory Structure" icon="folder-tree" href="/dev/directory-structure">
+    Explore the codebase organization
+  </Card>
+  
+  <Card title="Models Reference" icon="database" href="/dev/models">
+    Learn about the data models
+  </Card>
+  
+  <Card title="Program Modules" icon="puzzle-piece" href="/dev/program-modules">
+    Understand the module system
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/dev/contributing">
+    Start contributing to the project
+  </Card>
+</CardGroup>

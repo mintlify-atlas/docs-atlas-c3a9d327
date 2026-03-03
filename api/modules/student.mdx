@@ -1,0 +1,393 @@
+---
+title: Student Modules
+description: Program modules for student registration and participation in ESP programs
+---
+
+## Overview
+
+Student modules (`module_type="learn"`) handle all aspects of the student experience, from initial registration through class selection and confirmation. These modules appear in the student registration interface at `/learn/<program>/`.
+
+## Core Module
+
+### StudentRegCore
+
+**File**: `esp/esp/program/modules/handlers/studentregcore.py`
+
+**Purpose**: Serves the main student registration page that aggregates all student registration steps.
+
+**Key Features**:
+- Displays all enabled student modules as steps
+- Enforces required module completion
+- Provides confirmation and cancellation workflows
+- Tracks registration status
+- Sends confirmation emails
+
+**Main Views**:
+- `studentreg` - Main registration page showing all steps
+- `confirmreg` - Confirm registration and generate receipt
+- `cancelreg` - Cancel registration
+- `waitlist_subscribe` - Add student to program waitlist
+
+**User Tracking**:
+- `confirmed`: Students who clicked "Confirm Registration"
+- `attended`: Students who attended the program
+- `checked_in`: Currently checked-in students
+- `checked_out`: Currently checked-out students
+- `studentrep`: Student representatives
+- `waitlisted_students`: Students on the waitlist (if enabled)
+
+## Required Modules
+
+### RegProfileModule
+
+**File**: `esp/esp/program/modules/handlers/regprofilemodule.py`
+
+**Purpose**: Allows students to update their profile information for a specific program.
+
+**Module Properties**:
+- Admin Title: "Student Profile Editor"
+- Link Title: "Update Your Profile"
+- Required: Yes
+- Seq: 0 (first step)
+
+**Features**:
+- Contact information editing
+- Grade verification
+- Parent/guardian information
+- Emergency contact details
+
+**Completion**: Marked complete when student has a valid registration profile for the program.
+
+### StudentAcknowledgementModule
+
+**File**: `esp/esp/program/modules/handlers/studentacknowledgementmodule.py`
+
+**Purpose**: Requires students to acknowledge and agree to program rules and expectations.
+
+**Module Properties**:
+- Admin Title: "Student Acknowledgement"
+- Link Title: "Student Acknowledgement"
+- Required: Yes (configurable)
+- Choosable: No (must be manually added)
+
+**Features**:
+- Displays customizable agreement text
+- Requires checkbox confirmation
+- Records acknowledgement in database
+
+**User Tracking**:
+- `studentacknowledgement`: Students who have submitted the acknowledgement
+
+## Class Registration Modules
+
+### StudentClassRegModule
+
+**File**: `esp/esp/program/modules/handlers/studentclassregmodule.py`
+
+**Purpose**: The primary module for students to browse the catalog and register for classes.
+
+**Module Properties**:
+- Admin Title: "Student Class Registration"
+- Link Title: "Register for Classes"
+- Seq: 10
+- Choosable: Yes
+
+**Key Features**:
+- Interactive class catalog
+- Add/remove classes from schedule
+- Real-time capacity checking
+- Priority registration support
+- Waitlist functionality
+- Class application questions
+- AJAX-based registration
+
+**Main Views**:
+- `studentclassregmodule` - Main class registration interface
+- `catalog` - Browse available classes
+- `confirmreg` - Confirm class selections
+- `addclass` - AJAX endpoint to add a class
+- `delclass` - AJAX endpoint to remove a class
+- `ajax_schedule` - Get student's current schedule
+- `ajax_clearslot` - Clear all classes in a timeslot
+
+**Settings** (via `StudentClassRegModuleInfo`):
+- `enforce_max`: Prevent registration in full classes
+- `class_cap_multiplier`: Adjust class capacities dynamically
+- `use_priority`: Enable priority/lottery registration
+- `register_from_catalog`: Allow catalog-based registration
+- `visible_enrollments`: Show enrollment numbers
+- `visible_meeting_times`: Show class meeting times
+- `send_confirmation`: Send email on confirmation
+
+**User Tracking**:
+- `enrolled`: Students enrolled in at least one class
+- `checked_in`: Students currently checked in
+
+### StudentRegTwoPhase
+
+**File**: `esp/esp/program/modules/handlers/studentregtwophase.py`
+
+**Purpose**: Implements two-phase registration with a lottery system for high-demand programs.
+
+**Module Properties**:
+- Admin Title: "Two-Phase Student Registration"
+- Link Title: "Lottery Registration"
+- Seq: 11
+- Choosable: Yes
+
+**Phases**:
+1. **Phase 1**: Students rank classes by priority (1st choice, 2nd choice, etc.)
+2. **Lottery**: Admin runs lottery to assign students to classes
+3. **Phase 2**: Students register for remaining open spots
+
+**Main Views**:
+- `catalog` - Browse classes and set priorities
+- `studentreg` - Main lottery registration page
+- `lottery_preferences` - AJAX endpoint for priority updates
+
+### LotteryStudentRegModule
+
+**File**: `esp/esp/program/modules/handlers/lotterystudentregmodule.py`
+
+**Purpose**: Simplified lottery-only registration (no Phase 2).
+
+**Module Properties**:
+- Admin Title: "Lottery Student Registration"
+- Link Title: "Lottery Registration"
+- Choosable: Yes
+
+## Specialized Registration Modules
+
+### StudentRegPhaseZero
+
+**File**: `esp/esp/program/modules/handlers/studentregphasezero.py`
+
+**Purpose**: Pre-registration phase for course interest indication before classes are finalized.
+
+**Features**:
+- Students express interest in class categories
+- No enrollment or commitment
+- Helps admins gauge interest for scheduling
+
+### StudentJunctionAppModule
+
+**File**: `esp/esp/program/modules/handlers/studentjunctionappmodule.py`
+
+**Purpose**: Handles student applications for programs that require approval.
+
+**Module Properties**:
+- Admin Title: "Junction Application for Students"
+- Link Title: "Student Application"
+- Choosable: Yes
+
+## Financial Modules
+
+### StudentExtraCosts
+
+**File**: `esp/esp/program/modules/handlers/studentextracosts.py`
+
+**Purpose**: Allows students to purchase optional items (meals, t-shirts, etc.).
+
+**Module Properties**:
+- Admin Title: "Student Optional Fees"
+- Link Title: "Purchase Meals and T-Shirts"
+- Seq: 10
+- Choosable: Yes
+
+**Features**:
+- Select optional line items
+- Itemized cost display
+- Integration with accounting system
+
+### FinancialAidAppModule
+
+**File**: `esp/esp/program/modules/handlers/financialaidappmodule.py`
+
+**Purpose**: Student financial aid application.
+
+**Module Properties**:
+- Admin Title: "Financial Aid Application"
+- Link Title: "Apply for Financial Aid"
+- Choosable: Yes
+
+### DonationModule
+
+**File**: `esp/esp/program/modules/handlers/donationmodule.py`
+
+**Purpose**: Allows students/families to make optional donations.
+
+**Module Properties**:
+- Admin Title: "Donations"
+- Link Title: "Donate"
+- Choosable: Yes
+
+## Onsite Modules
+
+### StudentOnsite
+
+**File**: `esp/esp/program/modules/handlers/studentonsite.py`
+
+**Purpose**: Student-facing onsite module for viewing schedule and checking in.
+
+**Module Properties**:
+- Admin Title: "Student Onsite"
+- Link Title: "Onsite Info"
+- Module Type: "learn"
+- Choosable: Yes
+
+## Survey and Feedback Modules
+
+### StudentSurveyModule
+
+**File**: `esp/esp/program/modules/handlers/studentsurveymodule.py`
+
+**Purpose**: Post-program surveys for students.
+
+**Module Properties**:
+- Admin Title: "Student Survey"
+- Link Title: "Survey"
+- Choosable: No
+
+## Certificate Modules
+
+### StudentCertModule
+
+**File**: `esp/esp/program/modules/handlers/studentcertmodule.py`
+
+**Purpose**: Generates and displays certificates of completion.
+
+**Module Properties**:
+- Admin Title: "Student Certificate"
+- Link Title: "Certificate"
+- Choosable: Yes
+
+## Confirmation Modules
+
+### StudentRegConfirm
+
+**File**: `esp/esp/program/modules/handlers/studentregconfirm.py`
+
+**Purpose**: Simple confirmation step (different from StudentRegCore's confirmation).
+
+**Module Properties**:
+- Admin Title: "Student Registration Confirmation"
+- Link Title: "Confirm"
+- Choosable: Yes
+
+## Food Selection Modules
+
+### StudentLunchSelection
+
+**File**: `esp/esp/program/modules/handlers/studentlunchselection.py`
+
+**Purpose**: Allows students to pre-order lunch options.
+
+**Module Properties**:
+- Admin Title: "Student Lunch Selection"
+- Link Title: "Select Lunch"
+- Choosable: Yes
+
+**Features**:
+- Multiple meal period support
+- Dietary restrictions
+- Capacity tracking
+
+## Unenroll Module
+
+### UnenrollModule
+
+**File**: `esp/esp/program/modules/handlers/unenrollmodule.py`
+
+**Purpose**: Allows students to drop individual classes (vs. full registration cancellation).
+
+**Module Properties**:
+- Admin Title: "Student Unenroll"
+- Link Title: "Drop Classes"
+- Choosable: Yes
+
+## Custom Form Modules
+
+### StudentCustomFormModule
+
+**File**: `esp/esp/program/modules/handlers/studentcustomformmodule.py`
+
+**Purpose**: Generic custom form handler for program-specific student data collection.
+
+**Module Properties**:
+- Admin Title: "Student Custom Form"
+- Link Title: "Custom Form"
+- Choosable: Yes
+
+### FormstackAppModule
+
+**File**: `esp/esp/program/modules/handlers/formstackappmodule.py`
+
+**Purpose**: Integration with Formstack for external form handling.
+
+**Module Properties**:
+- Admin Title: "Formstack Application"
+- Link Title: "Application"
+- Choosable: Yes
+
+### FormstackMedliabModule
+
+**File**: `esp/esp/program/modules/handlers/formstackmedliabmodule.py`
+
+**Purpose**: Medical and liability form collection via Formstack.
+
+**Module Properties**:
+- Admin Title: "Formstack Medical/Liability"
+- Link Title: "Medical and Liability Forms"
+- Choosable: Yes
+
+### MedicalBypassModule
+
+**File**: `esp/esp/program/modules/handlers/medicalbypassmodule.py`
+
+**Purpose**: Allows admins to bypass medical form requirements for specific students.
+
+**Module Properties**:
+- Admin Title: "Medical Bypass"
+- Module Type: "manage"
+- Choosable: Yes
+
+## Development Notes
+
+### Creating a Custom Student Module
+
+To create a new student module:
+
+1. Create a new file in `esp/esp/program/modules/handlers/`
+2. Inherit from `ProgramModuleObj`
+3. Set `module_type = "learn"`
+4. Implement required methods:
+   - `module_properties()` - Define module metadata
+   - Main view with `@main_call` and `@needs_student`
+   - `isCompleted()` if the module should be a required step
+
+### Common Decorators for Student Modules
+
+```python
+@main_call
+@needs_student_in_grade  # Checks grade range
+@meets_deadline('/MyDeadline')  # Checks permission deadline
+@meets_cap  # Checks program capacity
+def myview(self, request, tl, one, two, module, extra, prog):
+    # Implementation
+    pass
+```
+
+### Integration with StudentRegCore
+
+StudentRegCore automatically:
+- Lists all enabled student modules
+- Checks `isCompleted()` for required modules
+- Calls `prepare()` to add context to the main page
+- Enforces module sequence via the `seq` property
+
+## See Also
+
+- [Program Modules Overview](/api/modules/overview)
+- [Teacher Modules](/api/modules/teacher)
+- [Admin Modules](/api/modules/admin)
+- [Onsite Modules](/api/modules/onsite)

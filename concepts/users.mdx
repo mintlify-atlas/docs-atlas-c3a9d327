@@ -1,0 +1,566 @@
+---
+title: Users and User Types
+description: Understanding ESPUser and the different user roles in the ESP Website - Students, Teachers, Administrators, and more
+---
+
+## Overview
+
+The ESP Website uses **ESPUser** as its user model, extending Django's built-in User model with additional functionality for educational programs.
+
+<Info>
+  ESPUser is a proxy model over Django's `django.contrib.auth.User`, meaning it adds methods without adding database fields.
+</Info>
+
+## User Types
+
+Users can have one or more **roles** (also called "user types") that determine their permissions and available actions:
+
+<CardGroup cols={2}>
+  <Card title="Student" icon="graduation-cap">
+    Students who register for and attend classes
+  </Card>
+  <Card title="Teacher" icon="chalkboard-user">
+    Volunteer teachers who propose and teach classes
+  </Card>
+  <Card title="Educator" icon="apple-whole">
+    K-12 educators (teachers from schools)
+  </Card>
+  <Card title="Guardian" icon="user-shield">
+    Parents/guardians of students
+  </Card>
+  <Card title="Volunteer" icon="hands-helping">
+    Onsite volunteers who help run programs
+  </Card>
+  <Card title="Administrator" icon="user-gear">
+    Program administrators with management access
+  </Card>
+</CardGroup>
+
+### User Type Implementation
+
+User types are implemented via Django Groups:
+
+```python
+# Check user type
+user.isStudent()       # True if user is in Student group
+user.isTeacher()       # True if user is in Teacher group  
+user.isAdministrator() # True if user has admin privileges
+
+# Get all user types for a user
+user.getUserTypes()  # Returns: ['Student', 'Teacher']
+
+# Add a user type
+user.makeRole('Volunteer')
+
+# Remove a user type  
+user.removeRole('Volunteer')
+```
+
+### Default User Types
+
+From `esp/esp/users/models/__init__.py`:
+
+```python
+DEFAULT_USER_TYPES = [
+    ['Student', {
+        'label': 'Student (up through 12th grade)',
+        'profile_form': 'StudentProfileForm'
+    }],
+    ['Teacher', {
+        'label': 'Volunteer Teacher',
+        'profile_form': 'TeacherProfileForm'
+    }],
+    ['Guardian', {
+        'label': 'Guardian of Student',
+        'profile_form': 'GuardianProfileForm'
+    }],
+    ['Educator', {
+        'label': 'K-12 Educator',
+        'profile_form': 'EducatorProfileForm'
+    }],
+    ['Volunteer', {
+        'label': 'Onsite Volunteer',
+        'profile_form': 'VolunteerProfileForm'
+    }]
+]
+```
+
+<Note>
+  User types can be customized via the `user_types` Tag to add, remove, or modify roles for your organization.
+</Note>
+
+## The ESPUser Model
+
+### Core Attributes
+
+ESPUser inherits from Django's User model:
+
+```python
+class ESPUser(User, BaseESPUser):
+    # Inherited from Django User:
+    username      # Unique username
+    first_name    # First name
+    last_name     # Last name  
+    email         # Email address
+    password      # Hashed password
+    is_active     # Account enabled?
+    is_staff      # Staff status
+    is_superuser  # Superuser status
+    
+    # Additional ESPUser properties
+    objects = ESPUserManager()
+```
+
+### Useful Methods
+
+```python
+# Name formatting
+user.name()              # "John Smith"
+user.name_last_first()   # "Smith, John"
+user.nonblank_name()     # Falls back to username if name is blank
+
+# Email
+user.get_email_sendto_address()  # "John Smith <john@example.com>"
+
+# User display
+user.ajax_str()  # "Smith, John (jsmith)"
+```
+
+## User Profiles
+
+### RegistrationProfile
+
+Each user can have multiple **RegistrationProfile** objects that store additional information:
+
+```python
+class RegistrationProfile(models.Model):
+    user = models.ForeignKey(ESPUser)
+    program = models.ForeignKey(Program, blank=True, null=True)
+    
+    # Contact information
+    contact_user = models.ForeignKey(ContactInfo, related_name='as_user')
+    contact_guardian = models.ForeignKey(ContactInfo, related_name='as_guardian')
+    contact_emergency = models.ForeignKey(ContactInfo, related_name='as_emergency')
+    
+    # Role-specific information
+    student_info = models.ForeignKey(StudentInfo)
+    teacher_info = models.ForeignKey(TeacherInfo)
+    guardian_info = models.ForeignKey(GuardianInfo)
+    educator_info = models.ForeignKey(EducatorInfo)
+    
+    # Metadata
+    last_ts = models.DateTimeField()
+    most_recent_profile = models.BooleanField()
+```
+
+### Getting Profiles
+
+```python
+# Get user's most recent profile
+profile = user.getLastProfile()
+
+# Get profile for specific program
+profile = RegistrationProfile.getLastForProgram(user, program)
+
+# Access profile information
+if profile.student_info:
+    grade = user.getGrade(program)
+    graduation_year = profile.student_info.graduation_year
+```
+
+## Student-Specific Features
+
+### StudentInfo
+
+Stores student-specific information:
+
+```python
+class StudentInfo(models.Model):
+    user = models.ForeignKey(ESPUser)
+    graduation_year = models.IntegerField()  # Year of high school graduation
+    school = models.CharField(max_length=128)
+    heard_about = models.TextField()  # How they heard about the program
+    # ... and more fields
+```
+
+### Grade Calculation
+
+The system calculates a student's grade based on graduation year:
+
+```python
+# Get student's current grade
+grade = user.getGrade(program)
+
+# Get year of graduation  
+yog = user.getYOG(program)
+
+# Convert between grade and YOG
+grade = ESPUser.gradeFromYOG(yog, schoolyear=2024)
+yog = ESPUser.YOGFromGrade(grade, schoolyear=2024)
+```
+
+<Accordion title="How grade calculation works">
+  The system uses a "school year" that runs from August to July:
+  
+  - **School year 2024** = August 2023 through July 2024
+  - If a student graduates in 2026, in school year 2024 they are in 10th grade
+  - Grade = SchoolYear + 12 - GraduationYear
+  - Example: 2024 + 12 - 2026 = 10th grade
+</Accordion>
+
+### Student Registration
+
+Find what a student is registered for:
+
+```python
+# Classes enrolled in
+enrolled_classes = user.getEnrolledClasses(program)
+enrolled_sections = user.getEnrolledSections(program)
+
+# All registrations (including applications, waitlist, etc.)
+all_sections = user.getSections(program)
+
+# Check specific enrollment
+if user.isEnrolledInClass(class_subject):
+    print("Student is enrolled!")
+```
+
+## Teacher-Specific Features
+
+### TeacherInfo
+
+Stores teacher-specific information:
+
+```python  
+class TeacherInfo(models.Model):
+    user = models.ForeignKey(ESPUser)
+    affiliation = models.CharField(max_length=64)  # University, employer, etc.
+    college_name = models.CharField(max_length=128)
+    major = models.CharField(max_length=64)
+    # ... and more fields
+```
+
+### Teacher Classes
+
+Find classes a teacher is teaching:
+
+```python
+# Classes taught in a program
+taught_classes = user.getTaughtClasses(program)
+taught_sections = user.getTaughtSections(program)
+
+# All classes ever taught
+all_classes = user.getTaughtClassesAll()
+
+# Programs taught in
+programs = user.getTaughtPrograms()
+```
+
+### Teacher Availability
+
+Teachers indicate when they're available:
+
+```python
+# Get available times for a program
+available_times = user.getAvailableTimes(program)
+
+# Add availability
+user.addAvailableTime(program, timeslot)
+
+# Clear all availability
+user.clearAvailableTimes(program)
+```
+
+### Teaching Time
+
+Calculate how much time a teacher is teaching:
+
+```python
+# Total teaching duration
+duration = user.getTaughtTime(program)
+# Returns timedelta object
+
+print(f"Teaching {duration.total_seconds() / 3600} hours")
+```
+
+## Administrator Features
+
+### Admin Permissions
+
+Administrators have special privileges:
+
+```python
+# Check if user is admin
+if user.isAdministrator(program):
+    # Can manage this program
+    pass
+
+if user.isAdministrator():  # No program specified
+    # Global administrator
+    pass
+```
+
+### Permission Model
+
+Granular permissions can be granted:
+
+```python
+class Permission(ExpirableModel):
+    user = models.ForeignKey(ESPUser, blank=True, null=True)
+    role = models.ForeignKey(Group, blank=True, null=True)  # Or to entire group
+    program = models.ForeignKey(Program, blank=True, null=True)
+    permission_type = models.CharField(max_length=80)
+    # start_date and end_date from ExpirableModel
+```
+
+Common permission types:
+- `Administer` - Full program management
+- `Onsite` - Access onsite check-in interface  
+- `OverrideFull` - Register for full programs/classes
+- `OverridePhaseZero` - Skip lottery phase
+
+```python
+# Grant admin permission
+Permission.objects.create(
+    user=user,
+    program=program,
+    permission_type="Administer"
+)
+
+# Check permission
+if Permission.user_has_perm(user, 'Onsite', program):
+    # User can access onsite interface
+    pass
+```
+
+## User Morphing
+
+Administrators can "morph" into other users to see their view:
+
+```python
+# Admin morphs into student
+admin.switch_to_user(
+    request,
+    student,
+    retUrl="/manage/",
+    retTitle="Return to Admin",
+    onsite=False
+)
+
+# Later, switch back
+admin.switch_back(request)
+
+# Check if currently morphed
+if user.is_morphed(request):
+    original_user = user.get_old(request)
+```
+
+<Warning>
+  For security, you cannot morph into another administrator.
+</Warning>
+
+## Contact Information
+
+### ContactInfo Model
+
+Stores contact details:
+
+```python
+class ContactInfo(models.Model):
+    user = models.ForeignKey(ESPUser)
+    first_name = models.CharField(max_length=64)
+    last_name = models.CharField(max_length=64)
+    email = models.EmailField()
+    phone_day = PhoneNumberField()
+    phone_cell = PhoneNumberField()
+    address_street = models.CharField(max_length=100)
+    address_city = models.CharField(max_length=50)
+    address_state = models.CharField(max_length=2)
+    address_zip = models.CharField(max_length=5)
+    # ... and more
+```
+
+Registration profiles can have multiple contact records:
+- `contact_user` - Student's own contact info
+- `contact_guardian` - Parent/guardian contact
+- `contact_emergency` - Emergency contact
+
+## Finding Users
+
+### By Program Involvement
+
+```python
+# All students in a program
+students = program.students()['classreg']
+
+# All teachers in a program  
+teachers = program.teachers()['class_approved']
+
+# All volunteers
+volunteers = program.volunteers()['volunteer_all']
+```
+
+### By User Type
+
+```python
+# All students in the system
+all_students = ESPUser.getAllOfType('Student', QObject=False)
+
+# As a Q object for filtering
+student_q = ESPUser.getAllOfType('Student', QObject=True)
+```
+
+### By Name or Username
+
+```python
+# Autocomplete search
+results = ESPUser.ajax_autocomplete("Smith, J")
+# Searches last name, first name, username, and ID
+
+# Get user by name (if multiple exist)
+user = ESPUser.getUserFromNum("John", "Smith", 0)  # First John Smith
+user = ESPUser.getUserFromNum("John", "Smith", 1)  # Second John Smith
+```
+
+## User Creation
+
+### Generating Usernames
+
+```python
+# Get an available username
+username = ESPUser.get_unused_username("John", "Smith")
+# Returns: "jsmith" or "jsmith2" if jsmith exists
+```
+
+### Creating Users
+
+```python
+# Create a new user
+user = ESPUser.objects.create_user(
+    username="jsmith",
+    email="jsmith@example.com",
+    password="secure_password",
+    first_name="John",
+    last_name="Smith"
+)
+
+# Add user type
+user.makeRole('Student')
+
+# Create profile
+profile = RegistrationProfile.objects.create(
+    user=user,
+    program=program
+)
+```
+
+## Practical Examples
+
+### Check if student meets class requirements
+
+```python
+def can_register_for_class(student, class_subject, program):
+    """Check if student can register for a class."""
+    
+    # Check grade level
+    student_grade = student.getGrade(program)
+    if student_grade < class_subject.grade_min or student_grade > class_subject.grade_max:
+        return False, "Grade level not in range"
+    
+    # Check if already registered
+    if student.isEnrolledInClass(class_subject):
+        return False, "Already enrolled"
+    
+    return True, "OK"
+```
+
+### Get teacher's schedule
+
+```python
+def get_teacher_schedule(teacher, program):
+    """Get all times when a teacher is teaching."""
+    
+    schedule = []
+    sections = teacher.getTaughtSections(program)
+    
+    for section in sections:
+        for time in section.meeting_times.all():
+            schedule.append({
+                'class': section.parent_class.title,
+                'section': section.emailcode(),
+                'time': time.pretty_time(),
+                'room': ', '.join(section.prettyrooms())
+            })
+    
+    return sorted(schedule, key=lambda x: x['time'])
+```
+
+### Find all students in a grade
+
+```python
+def students_in_grade(program, grade):
+    """Find all students in a specific grade for a program."""
+    
+    yog = ESPUser.YOGFromGrade(grade, ESPUser.program_schoolyear(program))
+    
+    students = program.students()['classreg']
+    students_in_grade = [
+        s for s in students 
+        if s.getYOG(program) == yog
+    ]
+    
+    return students_in_grade
+```
+
+## Best Practices
+
+<Tip>
+  **Use getLastProfile()**: Always use `user.getLastProfile()` rather than directly querying RegistrationProfile - it handles edge cases and returns an empty profile if none exists.
+</Tip>
+
+<Warning>
+  **Check user types**: Don't assume a user has only one type. A user can be both a Student and a Teacher.
+</Warning>
+
+<Tip>
+  **Program-specific grades**: Always pass the program when getting a student's grade: `user.getGrade(program)`. Grade can vary by program due to timing.
+</Tip>
+
+## Common Queries
+
+### Students who haven't filled out profile
+
+```python
+students = program.students()['classreg']
+no_profile = students.exclude(
+    registrationprofile__program=program,
+    registrationprofile__student_info__isnull=False
+)
+```
+
+### Teachers teaching multiple classes
+
+```python
+from django.db.models import Count
+
+teachers = ESPUser.objects.filter(
+    classsubject__parent_program=program
+).annotate(
+    num_classes=Count('classsubject')
+).filter(
+    num_classes__gt=1
+)
+```
+
+### Users who are both students and teachers
+
+```python
+student_group = Group.objects.get(name='Student')
+teacher_group = Group.objects.get(name='Teacher')
+
+both = ESPUser.objects.filter(
+    groups__in=[student_group]
+).filter(
+    groups__in=[teacher_group]
+).distinct()
+```

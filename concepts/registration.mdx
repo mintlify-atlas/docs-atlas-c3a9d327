@@ -1,0 +1,645 @@
+---
+title: Registration System
+description: Understanding how student registration works in the ESP Website - from interest to enrollment
+---
+
+## Overview
+
+The ESP Website uses a flexible registration system that tracks how students relate to classes through different **registration types**. This allows for various registration workflows including:
+
+- Standard first-come-first-served registration
+- Two-phase lottery systems
+- Priority registration
+- Waitlists
+- Class applications
+
+## Core Concepts
+
+The registration system consists of three main models:
+
+<CardGroup cols={3}>
+  <Card title="RegistrationType" icon="tags">
+    Defines types of relationships (Enrolled, Applied, Waitlisted, etc.)
+  </Card>
+  <Card title="StudentRegistration" icon="clipboard-check">
+    Links a student to a section with a specific relationship type
+  </Card>
+  <Card title="StudentSubjectInterest" icon="star">
+    Indicates interest in an entire class (used in lottery systems)
+  </Card>
+</CardGroup>
+
+## RegistrationType
+
+### What is a RegistrationType?
+
+A **RegistrationType** defines a way a student can be associated with a class. It's like a label that describes the relationship.
+
+From `esp/esp/program/models/__init__.py`:
+
+```python
+class RegistrationType(models.Model):
+    name = models.CharField(max_length=32)          # e.g., "Enrolled"
+    displayName = models.CharField(max_length=32)   # e.g., "Enrolled in class"
+    description = models.TextField()                # Detailed explanation
+    category = models.CharField(max_length=32)      # "student" or other grouping
+```
+
+### Common Registration Types
+
+<AccordionGroup>
+  <Accordion title="Standard Registration">
+    - **Enrolled**: Student is registered for the class
+    - **Applied**: Student has applied but not yet enrolled
+    - **Waitlisted**: Class is full, student is on waitlist
+  </Accordion>
+  
+  <Accordion title="Lottery Registration">
+    - **Interested**: Student marked interest in lottery
+    - **Priority/1**: Student's first priority choice
+    - **Priority/2**: Student's second priority choice  
+    - **Priority/3**: Student's third priority choice
+  </Accordion>
+  
+  <Accordion title="Attendance Tracking">
+    - **Attended**: Student attended the class
+    - **Rejected**: Student's application was rejected
+  </Accordion>
+</AccordionGroup>
+
+### Getting Registration Types
+
+```python
+# Get map of all registration types
+reg_map = RegistrationType.get_map()
+enrolled_type = reg_map['Enrolled']
+applied_type = reg_map['Applied']
+
+# Ensure specific types exist
+reg_map = RegistrationType.get_map(
+    include=['Enrolled', 'Waitlisted'],
+    category='student'
+)
+
+# Get a specific type (cached)
+enrolled = RegistrationType.get_cached('Enrolled', 'student')
+```
+
+<Note>
+  Registration types are created automatically as needed. The first "Enrolled" type is created during system installation.
+</Note>
+
+## StudentRegistration
+
+### The Core Registration Model
+
+**StudentRegistration** is the many-to-many relationship between students and class sections:
+
+```python
+class StudentRegistration(ExpirableModel):
+    section = models.ForeignKey(ClassSection)
+    user = models.ForeignKey(ESPUser)
+    relationship = models.ForeignKey(RegistrationType)
+    # Inherited from ExpirableModel:
+    start_date = models.DateTimeField(blank=True, null=True)
+    end_date = models.DateTimeField(blank=True, null=True)
+```
+
+### Key Features
+
+<Steps>
+  <Step title="Expirable">
+    Registrations can have start and end dates, allowing them to be "cancelled" without deletion
+  </Step>
+  <Step title="Typed">
+    Each registration has a relationship type, making it flexible
+  </Step>
+  <Step title="Section-Specific">
+    Students register for specific sections, not just classes
+  </Step>
+</Steps>
+
+### Creating Registrations
+
+```python
+# Get registration type
+enrolled = RegistrationType.get_map()['Enrolled']
+
+# Create registration
+reg = StudentRegistration.objects.create(
+    user=student,
+    section=section,
+    relationship=enrolled
+)
+
+# The student is now enrolled!
+```
+
+### Querying Registrations
+
+```python
+# Get all valid (non-expired) registrations for a section
+registrations = StudentRegistration.valid_objects().filter(
+    section=section,
+    relationship__name='Enrolled'
+)
+
+# Get students from registrations
+students = [reg.user for reg in registrations]
+
+# Or use the section's helper method
+enrolled_students = section.students()  # Default: Enrolled
+```
+
+### Canceling Registrations
+
+Rather than deleting, set an end_date:
+
+```python
+from datetime import datetime
+
+# "Cancel" a registration
+reg.end_date = datetime.now()
+reg.save()
+
+# It's now expired and won't show in valid_objects()
+```
+
+## StudentSubjectInterest
+
+### Class-Level Interest
+
+For lottery systems, students can mark interest in entire classes (not specific sections):
+
+```python
+class StudentSubjectInterest(ExpirableModel):
+    subject = models.ForeignKey(ClassSubject)  # The class, not section
+    user = models.ForeignKey(ESPUser)
+    # start_date and end_date from ExpirableModel
+```
+
+This is typically represented by "stars" in a two-phase lottery interface.
+
+### Working with Interests
+
+```python
+# Student stars a class in lottery
+interest = StudentSubjectInterest.objects.create(
+    user=student,
+    subject=class_subject
+)
+
+# Get all classes a student is interested in
+interests = StudentSubjectInterest.valid_objects().filter(user=student)
+interested_classes = [i.subject for i in interests]
+
+# Get all students interested in a class
+class_interests = StudentSubjectInterest.valid_objects().filter(
+    subject=class_subject
+)
+interested_students = [i.user for i in class_interests]
+```
+
+## Registration Workflows
+
+### Standard First-Come-First-Served
+
+Simplest registration model:
+
+<Steps>
+  <Step title="Student Views Catalog">
+    Browses available classes and sections
+  </Step>
+  <Step title="Student Clicks Register">
+    Selects a specific section
+  </Step>
+  <Step title="Check Capacity">
+    System checks if section is full
+  </Step>
+  <Step title="Check Conflicts">
+    System checks for schedule conflicts
+  </Step>
+  <Step title="Create Registration">
+    StudentRegistration created with relationship="Enrolled"
+  </Step>
+</Steps>
+
+```python
+def register_student(student, section):
+    """Register a student for a section."""
+    
+    # Check if student can add this section
+    error = section.cannotAdd(student, checkFull=True)
+    if error:
+        return False, error
+    
+    # Create registration
+    enrolled = RegistrationType.get_map()['Enrolled']
+    reg = StudentRegistration.objects.create(
+        user=student,
+        section=section,
+        relationship=enrolled
+    )
+    
+    return True, "Successfully registered!"
+```
+
+### Two-Phase Lottery
+
+More complex workflow used for high-demand programs:
+
+#### Phase 0: Interest Marking
+
+<Steps>
+  <Step title="Student Stars Classes">
+    Creates StudentSubjectInterest for classes of interest
+  </Step>
+  <Step title="No Commitments Yet">
+    These are just expressions of interest, not registrations
+  </Step>
+</Steps>
+
+```python
+# Student stars 3 classes
+for class_subject in [class1, class2, class3]:
+    StudentSubjectInterest.objects.create(
+        user=student,
+        subject=class_subject
+    )
+```
+
+#### Phase 1: Priority Registration
+
+<Steps>
+  <Step title="Student Ranks Classes">
+    Assigns priority levels to specific sections
+  </Step>
+  <Step title="System Records Priorities">
+    Creates StudentRegistration with relationship="Priority/1", "Priority/2", etc.
+  </Step>
+  <Step title="Registration Closes">
+    No more changes allowed
+  </Step>
+</Steps>
+
+```python
+# Student selects section priorities
+for i, section in enumerate([section1, section2, section3]):
+    priority = RegistrationType.get_map()[f'Priority/{i+1}']
+    StudentRegistration.objects.create(
+        user=student,
+        section=section,
+        relationship=priority
+    )
+```
+
+#### Phase 2: Lottery and Confirmation
+
+<Steps>
+  <Step title="Run Lottery Algorithm">
+    System assigns students to classes based on priorities, availability, and randomness
+  </Step>
+  <Step title="Update to Enrolled">
+    Winning registrations changed from Priority/X to Enrolled
+  </Step>
+  <Step title="Students Confirm">
+    Students view assignments and confirm attendance
+  </Step>
+</Steps>
+
+### Priority Levels
+
+Some programs limit how many "priority" registrations students can make:
+
+```python
+# Program configuration
+scrmi = program.studentclassregmoduleinfo
+scrmi.use_priority = True
+scrmi.priority_limit = 10  # Max 10 priority classes
+
+# Check student's priority level for a timeslot
+priority = student.getRegistrationPriority(program, [timeslot])
+# Returns:
+# - 0 if already enrolled in that timeslot
+# - N (1, 2, 3...) for the next available priority level
+
+if priority > scrmi.priority_limit:
+    # Student has used all priority slots
+    return "Cannot add more priority classes"
+```
+
+## Checking Registration Status
+
+### Can a Student Add a Class?
+
+The `section.cannotAdd()` method performs comprehensive checks:
+
+```python
+error_message = section.cannotAdd(
+    student,
+    checkFull=True,              # Check capacity?
+    autocorrect_constraints=True, # Try to fix conflicts?
+    ignore_constraints=False,     # Skip constraint checking?
+    webapp=False                 # Web vs. kiosk behavior?
+)
+
+if error_message:
+    # error_message explains why student cannot add
+    print(f"Cannot register: {error_message}")
+else:
+    # Student can be added
+    create_registration(student, section)
+```
+
+### What Does cannotAdd Check?
+
+<AccordionGroup>
+  <Accordion title="Capacity">
+    - Is the section at capacity?
+    - Does the program have a waiting list?
+  </Accordion>
+  
+  <Accordion title="Schedule Conflicts">
+    - Is student already in another class at this time?
+    - Is student already in a different section of this class?
+  </Accordion>
+  
+  <Accordion title="Registration Status">
+    - Is registration open for this section?
+    - Has the section been cancelled?
+  </Accordion>
+  
+  <Accordion title="Priority Limits">
+    - Has student used all their priority slots? (if applicable)
+  </Accordion>
+  
+  <Accordion title="Schedule Constraints">
+    - Does adding this class violate program rules?
+    - Example: "Must take Class A before Class B"
+  </Accordion>
+</AccordionGroup>
+
+### Getting a Student's Schedule
+
+```python
+# Get all sections student is enrolled in
+sections = student.getEnrolledSections(program)
+
+# Get with specific registration types
+sections = student.getSections(
+    program,
+    verbs=['Enrolled', 'Waitlisted'],
+    valid_only=True
+)
+
+# Get just the classes (not sections)
+classes = student.getEnrolledClasses(program)
+```
+
+## Registration by Verb
+
+The system uses "verbs" (registration type names) to query registrations:
+
+```python
+# Section methods
+section.students()                    # Default: ['Enrolled']
+section.students(['Enrolled', 'Waitlisted'])
+section.num_students()                # Count enrolled
+section.num_students(['Applied'])     # Count applied
+
+# Class methods (aggregates across sections)
+class_subject.students()              # All enrolled students
+class_subject.num_students()
+
+# Student methods
+student.getSections(program, verbs=['Enrolled'])
+student.getClasses(program, verbs=['Applied', 'Enrolled'])
+```
+
+## RegistrationProfile
+
+In addition to class registrations, students fill out **RegistrationProfiles**:
+
+```python
+class RegistrationProfile(models.Model):
+    user = models.ForeignKey(ESPUser)
+    program = models.ForeignKey(Program, blank=True, null=True)
+    
+    # Contact information
+    contact_user = models.ForeignKey(ContactInfo)
+    contact_guardian = models.ForeignKey(ContactInfo)
+    contact_emergency = models.ForeignKey(ContactInfo)
+    
+    # Role-specific info
+    student_info = models.ForeignKey(StudentInfo)  # Grade, school, etc.
+    teacher_info = models.ForeignKey(TeacherInfo)  # Affiliation, bio, etc.
+    
+    # Metadata
+    last_ts = models.DateTimeField()
+    most_recent_profile = models.BooleanField()
+```
+
+This is separate from class registration - it's the profile information students fill out before they can register.
+
+### Profile Workflow
+
+<Steps>
+  <Step title="Student Arrives at Registration">
+    System checks if they have a current profile
+  </Step>
+  <Step title="Fill Out Profile">
+    Student enters contact info, emergency contacts, grade, etc.
+  </Step>
+  <Step title="Profile Saved">
+    RegistrationProfile created for this program
+  </Step>
+  <Step title="Access Class Registration">
+    Student can now browse and register for classes
+  </Step>
+</Steps>
+
+```python
+# Get or create profile for a program
+profile = RegistrationProfile.getLastForProgram(student, program)
+
+if profile.id is None:
+    # New profile - student needs to fill it out
+    redirect_to_profile_form()
+else:
+    # Profile exists - allow class registration
+    show_catalog()
+```
+
+## Advanced Topics
+
+### Schedule Constraints
+
+Programs can define constraints that limit what students can register for:
+
+```python
+# Example: Can't take Advanced Physics without Basic Physics
+constraint = ScheduleConstraint.objects.create(
+    program=program,
+    requirement=Requirement(label="take Basic Physics first")
+)
+
+# When student tries to add Advanced Physics:
+sm = ScheduleMap(student, program)
+sm.add_section(advanced_physics_section)
+
+if not constraint.evaluate(sm):
+    return "You must take Basic Physics first"
+```
+
+### Registration Module Configuration
+
+Each program has a `StudentClassRegModuleInfo` that configures registration:
+
+```python
+scrmi = program.studentclassregmoduleinfo
+
+# Configuration options
+scrmi.enforce_max = True              # Enforce class size maximums?
+scrmi.use_priority = True             # Use priority registration?
+scrmi.priority_limit = 10             # Max priority registrations
+scrmi.visible_enrollments = True      # Show enrollments in catalog?
+scrmi.visible_meeting_times = True    # Show times in catalog?
+scrmi.temporarily_full_text = "..."   # Message when section full
+
+# Capacity adjustments (applied after room/class size limits)
+scrmi.class_cap_multiplier = 1.0      # Multiply capacity by this
+scrmi.class_cap_offset = 0            # Add this to capacity
+```
+
+### Checking In Students
+
+Track attendance with the "Attended" relationship:
+
+```python
+attended = RegistrationType.get_map()['Attended']
+
+# Student attended a section
+StudentRegistration.objects.create(
+    user=student,
+    section=section,
+    relationship=attended
+)
+
+# Find students who attended
+attended_students = section.students(['Attended'])
+
+# Count attendance
+attendance_count = section.num_students(['Attended'])
+```
+
+## Practical Examples
+
+### Full Registration Flow
+
+```python
+def complete_registration(student, section):
+    """Complete registration process with all checks."""
+    
+    # 1. Check if student can join program
+    program = section.parent_class.parent_program
+    if not program.user_can_join(student):
+        return False, "Program is at capacity"
+    
+    # 2. Ensure student has a profile
+    profile = RegistrationProfile.getLastForProgram(student, program)
+    if not profile.student_info:
+        return False, "Please complete your profile first"
+    
+    # 3. Check if student can add this section
+    error = section.cannotAdd(student, checkFull=True)
+    if error:
+        return False, error
+    
+    # 4. Create registration
+    enrolled = RegistrationType.get_map()['Enrolled']
+    StudentRegistration.objects.create(
+        user=student,
+        section=section,
+        relationship=enrolled
+    )
+    
+    return True, "Successfully registered!"
+```
+
+### Switching Sections
+
+```python
+def switch_sections(student, old_section, new_section):
+    """Move student from one section to another."""
+    
+    # Must be sections of the same class
+    if old_section.parent_class != new_section.parent_class:
+        return False, "Sections must be from the same class"
+    
+    # Check if new section is available
+    error = new_section.cannotAdd(student, checkFull=True)
+    if error:
+        return False, error
+    
+    # Remove from old section
+    old_regs = StudentRegistration.valid_objects().filter(
+        user=student,
+        section=old_section,
+        relationship__name='Enrolled'
+    )
+    old_regs.update(end_date=datetime.now())
+    
+    # Add to new section
+    enrolled = RegistrationType.get_map()['Enrolled']
+    StudentRegistration.objects.create(
+        user=student,
+        section=new_section,
+        relationship=enrolled
+    )
+    
+    return True, "Successfully switched sections"
+```
+
+### Get Student's Full Schedule
+
+```python
+def get_student_schedule(student, program):
+    """Get formatted schedule for display."""
+    
+    schedule = []
+    sections = student.getEnrolledSections(program)
+    
+    for section in sections:
+        for timeslot in section.meeting_times.all():
+            schedule.append({
+                'class': section.parent_class.title,
+                'code': section.emailcode(),
+                'time': timeslot.pretty_time(),
+                'room': ', '.join(section.prettyrooms()),
+                'teachers': ', '.join(
+                    t.name() for t in section.parent_class.get_teachers()
+                )
+            })
+    
+    # Sort by time
+    schedule.sort(key=lambda x: x['time'])
+    return schedule
+```
+
+## Best Practices
+
+<Tip>
+  **Use valid_objects()**: Always query StudentRegistration with `valid_objects()` to automatically filter out expired registrations.
+</Tip>
+
+<Warning>
+  **Don't delete registrations**: Use `end_date` to "cancel" registrations. This preserves history and is important for reporting.
+</Warning>
+
+<Tip>
+  **Check conflicts**: Always use `section.cannotAdd()` before creating registrations - it handles all the complex validation logic.
+</Tip>
+
+<Note>
+  **Registration types are flexible**: You can create custom registration types for your specific workflow needs.
+</Note>

@@ -1,0 +1,427 @@
+---
+title: Tag System
+description: Configuration system for program-specific and global settings using the Tag model
+---
+
+The ESP Website uses a flexible tag system to manage configuration settings. Tags can be global (apply to all programs) or program-specific, and they store configuration values in the database rather than in code.
+
+## Overview
+
+Tags provide a way to:
+- Configure program-specific behavior without code changes
+- Enable/disable features per program
+- Store configuration values accessible throughout the codebase
+- Provide admin-editable settings through the tag settings page
+
+The tag system is implemented in `esp/esp/tagdict/models.py` with tag definitions in `esp/esp/tagdict/__init__.py`.
+
+## Tag Types
+
+### Global Tags
+
+Apply to the entire site, independent of any program:
+
+```python
+from esp.tagdict.models import Tag
+
+# Boolean tag
+allow_global = Tag.getBooleanTag('allow_global_restypes')
+
+# Non-boolean tag
+threshold = Tag.getTag('nearly_full_threshold')
+```
+
+### Program Tags
+
+Apply to specific programs, with fallback to global values:
+
+```python
+from esp.tagdict.models import Tag
+
+# Get program-specific value, falling back to global
+min_grade = Tag.getProgramTag('grade_min', program=my_program)
+
+# Boolean program tag
+allow_priority = Tag.getBooleanTag('priority_registration', program=my_program)
+```
+
+## Using Tags
+
+### Reading Tag Values
+
+```python
+from esp.tagdict.models import Tag
+
+# Global boolean tag
+if Tag.getBooleanTag('fruitsalad_sounds'):
+    play_sound()
+
+# Global non-boolean tag
+full_name = Tag.getTag('full_group_name')
+
+# Program-specific tag
+student_reg_start = Tag.getProgramTag('student_reg_start', program=program)
+
+# With explicit default
+custom_value = Tag.getTag('custom_setting', default='default_value')
+```
+
+### Setting Tag Values
+
+```python
+from esp.tagdict.models import Tag
+
+# Set global tag
+Tag.setTag('full_group_name', value='MIT Educational Studies Program')
+
+# Set program-specific tag
+Tag.setTag('grade_min', target=program, value='7')
+
+# Set boolean tag (store as string)
+Tag.setTag('allow_walk_ins', target=program, value='True')
+
+# Use EMPTY_TAG for contentless tags (evaluates to True)
+Tag.setTag('feature_enabled', target=program, value=Tag.EMPTY_TAG)
+```
+
+### Unsetting Tags
+
+```python
+from esp.tagdict.models import Tag
+
+# Remove global tag
+Tag.unSetTag('custom_setting')
+
+# Remove program-specific tag
+Tag.unSetTag('grade_min', target=program)
+
+# Returns count of deleted tags (0 or 1)
+if Tag.unSetTag('feature_enabled', target=program):
+    print("Tag was removed")
+```
+
+## Creating New Tags
+
+### 1. Define the Tag
+
+Add to `esp/esp/tagdict/__init__.py`:
+
+```python
+# For global tags
+all_global_tags = {
+    # ... existing tags ...
+    'new_feature_enabled': {
+        'is_boolean': True,
+        'help_text': 'Enable the new feature across the site',
+        'default': False,
+        'category': 'manage',
+        'is_setting': True,
+    },
+    'max_classes_per_student': {
+        'is_boolean': False,
+        'help_text': 'Maximum number of classes a student can register for',
+        'default': '10',
+        'category': 'learn',
+        'is_setting': True,
+        'field': forms.IntegerField(min_value=1),
+    },
+}
+
+# For program-specific tags
+all_program_tags = {
+    # ... existing tags ...
+    'registration_cap': {
+        'is_boolean': False,
+        'help_text': 'Maximum number of students for this program',
+        'default': None,
+        'category': 'manage',
+        'is_setting': True,
+        'field': forms.IntegerField(min_value=0, required=False),
+    },
+}
+```
+
+### 2. Tag Definition Format
+
+```python
+'tag_key': {
+    'is_boolean': bool,        # True for boolean tags, False otherwise
+    'help_text': str,          # Help text shown to admins
+    'default': any,            # Default value (type matters)
+    'category': str,           # One of: teach, learn, manage, onsite, volunteer, theme
+    'is_setting': bool,        # Show on tag settings page?
+    'field': forms.Field(),    # Optional: custom Django form field
+}
+```
+
+### 3. Tag Categories
+
+Available categories defined in `tag_categories`:
+
+- **teach**: Teacher registration and class management
+- **learn**: Student registration and learning features  
+- **manage**: Administrative and program management
+- **onsite**: On-site check-in and operations
+- **volunteer**: Volunteer management
+- **theme**: Site theming and appearance
+
+### 4. Custom Form Fields
+
+Specify validation with custom fields:
+
+```python
+from django import forms
+from esp.tagdict import all_program_tags
+
+all_program_tags['teacher_stipend'] = {
+    'is_boolean': False,
+    'help_text': 'Stipend amount for teachers',
+    'default': '0.00',
+    'category': 'teach',
+    'is_setting': True,
+    'field': forms.DecimalField(
+        min_value=0, 
+        max_value=1000,
+        decimal_places=2
+    ),
+}
+```
+
+## Tag Model
+
+The `Tag` model uses Django's generic foreign key system:
+
+```python
+class Tag(models.Model):
+    key = models.SlugField(db_index=True)
+    value = models.TextField()
+    
+    # Generic ForeignKey for program-specific tags
+    content_type = models.ForeignKey(ContentType, blank=True, null=True)
+    object_id = models.PositiveIntegerField(blank=True, null=True)
+    target = GenericForeignKey(ct_field='content_type', fk_field='object_id')
+```
+
+### Query Examples
+
+```python
+from esp.tagdict.models import Tag
+from esp.program.models import Program
+
+# Get all tags for a program
+program_tags = Tag.objects.filter(
+    content_type=ContentType.objects.get_for_model(Program),
+    object_id=program.id
+)
+
+# Get all global tags
+global_tags = Tag.objects.filter(
+    content_type__isnull=True,
+    object_id__isnull=True
+)
+
+# Get specific tag
+tag = Tag.objects.get(
+    key='grade_min',
+    content_type=ContentType.objects.get_for_model(Program),
+    object_id=program.id
+)
+```
+
+## Common Tag Examples
+
+### Boolean Tags
+
+```python
+# Feature flags
+if Tag.getBooleanTag('allow_coteachers', program=program):
+    show_coteacher_field()
+
+# Permission checks
+if Tag.getBooleanTag('student_lottery_enabled', program=program):
+    run_lottery()
+
+# UI toggles
+if Tag.getBooleanTag('show_graduation_year_in_list'):
+    display_graduation_year()
+```
+
+### Numeric Tags
+
+```python
+# Grade restrictions
+min_grade = int(Tag.getProgramTag('grade_min', program=program))
+max_grade = int(Tag.getProgramTag('grade_max', program=program))
+
+if student.grade < min_grade or student.grade > max_grade:
+    raise ValidationError("Grade not eligible")
+
+# Capacity limits
+threshold = Decimal(Tag.getTag('nearly_full_threshold'))
+if section.enrolled_students >= section.capacity * threshold:
+    mark_nearly_full(section)
+```
+
+### String Tags
+
+```python
+# Custom text
+organization_name = Tag.getTag('full_group_name') or settings.INSTITUTION_NAME
+
+# Email addresses
+director_email = Tag.getProgramTag('director_email', program=program)
+
+# URLs
+parent_info_url = Tag.getProgramTag('parent_info_url', program=program)
+```
+
+### JSON Tags
+
+```python
+import json
+
+# Custom forms
+custom_forms_json = Tag.getTag('teacherreg_custom_forms')
+if custom_forms_json:
+    custom_forms = json.loads(custom_forms_json)
+    for form_name in custom_forms:
+        load_custom_form(form_name)
+
+# Difficulty choices
+difficulty_json = Tag.getTag('teacherreg_difficulty_choices')
+if difficulty_json:
+    choices = json.loads(difficulty_json)  # [[1, "Easy"], [2, "Medium"], ...]
+```
+
+## Caching
+
+Tag retrieval is cached using the `@cache_function` decorator:
+
+```python
+@cache_function
+def _getTag(cls, key, default=None, target=None):
+    try:
+        if target is not None:
+            ct = ContentType.objects.get_for_model(target)
+            return cls.objects.get(
+                key=key, 
+                content_type=ct, 
+                object_id=target.id
+            ).value
+        else:
+            return cls.objects.get(
+                key=key, 
+                content_type__isnull=True, 
+                object_id__isnull=True
+            ).value
+    except cls.DoesNotExist:
+        return default
+```
+
+Cache invalidation:
+
+```python
+_getTag.depend_on_row(
+    'tagdict.Tag', 
+    lambda tag: {'key': tag.key, 'target': tag.target}
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Don't Access Tags at Import Time">
+    Tag data is stored in the database, so don't access it during module imports:
+    
+    ```python
+    # BAD - runs at import time
+    MAX_STUDENTS = int(Tag.getTag('max_students'))
+    
+    # GOOD - runs when function is called
+    def get_max_students():
+        return int(Tag.getTag('max_students'))
+    ```
+  </Accordion>
+
+  <Accordion title="Validate Tag Data">
+    Implement validation since admins can set invalid values:
+    
+    ```python
+    min_grade = Tag.getProgramTag('grade_min', program=program)
+    try:
+        min_grade = int(min_grade)
+        if min_grade < 1 or min_grade > 12:
+            raise ValueError("Grade must be between 1 and 12")
+    except (ValueError, TypeError):
+        logger.error(f"Invalid grade_min tag: {min_grade}")
+        min_grade = 7  # fallback
+    ```
+  </Accordion>
+
+  <Accordion title="Use Appropriate Tag Types">
+    - Use `getBooleanTag()` for boolean values
+    - Use `getTag()` for strings and numbers
+    - Use `getProgramTag()` when you want program-specific values with global fallback
+  </Accordion>
+
+  <Accordion title="Provide Clear Help Text">
+    Help text is shown to admins in the settings interface:
+    
+    ```python
+    'help_text': 'Maximum number of classes a student can register for. '
+                 'Set to 0 for unlimited. Changes apply to new registrations only.'
+    ```
+  </Accordion>
+
+  <Accordion title="Choose Sensible Defaults">
+    Default values should represent the most common configuration:
+    
+    ```python
+    'default': False,  # Most features start disabled
+    'default': None,   # No default for required program-specific settings
+    'default': '10',   # Common numeric defaults as strings
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Admin Interface
+
+Tags with `'is_setting': True` appear on the tag settings page at `/manage/[program]/settings/tags/`.
+
+Admins can:
+- View all available tags with help text
+- Edit tag values through form fields
+- See current values vs. defaults
+- Set program-specific overrides
+
+## Troubleshooting
+
+<Warning>
+  The tag system logs warnings when:
+  - A tag key is not in the tag dictionaries
+  - `getBooleanTag()` is used on non-boolean tags
+  - `getTag()` is used on boolean tags
+  - Boolean string values ("true"/"false") are used with `getTag()`
+</Warning>
+
+### Common Issues
+
+```python
+# Warning: Tag not in list of global tags
+value = Tag.getTag('undefined_tag')
+# Add to all_global_tags or all_program_tags
+
+# Warning: Should use getBooleanTag
+value = Tag.getTag('some_boolean_tag')  
+# Use: Tag.getBooleanTag('some_boolean_tag')
+
+# Warning: Set to boolean value
+Tag.setTag('numeric_tag', value='True')  
+# Use proper type: Tag.setTag('numeric_tag', value='1')
+```
+
+## Related
+
+- Tag definitions: `esp/esp/tagdict/__init__.py`
+- Tag model: `esp/esp/tagdict/models.py`
+- Admin interface: `/manage/[program]/settings/tags/`

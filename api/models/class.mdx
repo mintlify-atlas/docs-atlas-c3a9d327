@@ -1,0 +1,472 @@
+---
+title: Class Models
+description: Models for managing class subjects and sections in educational programs
+---
+
+## Overview
+
+Classes in ESP are represented by two primary models:
+- **ClassSubject**: The class itself with title, description, and teachers
+- **ClassSection**: A specific meeting time/instance of a class
+
+A single ClassSubject can have multiple ClassSections for different times or parallel offerings.
+
+**Source:** `esp/esp/program/models/class_.py`
+
+## ClassSubject Model
+
+Represents a class/course offered in a program.
+
+### Core Fields
+
+<ParamField path="parent_program" type="ForeignKey" required>
+  Program this class belongs to
+  - Links to: `Program`
+  - Required field
+</ParamField>
+
+<ParamField path="category" type="ForeignKey" required>
+  Category/subject area of the class
+  - Links to: `ClassCategories`
+  - Examples: Math, Science, Arts, etc.
+</ParamField>
+
+<ParamField path="title" type="CharField" required>
+  Name/title of the class
+  - Max length: 200 characters
+</ParamField>
+
+<ParamField path="class_info" type="TextField">
+  Detailed description of the class content
+  - Rich text field for class information
+  - Shown to students in catalog
+</ParamField>
+
+<ParamField path="status" type="IntegerField">
+  Approval status of the class
+  - Choices: CANCELLED (-20), REJECTED (-10), UNREVIEWED (0), HIDDEN (5), ACCEPTED (10)
+  - Default: UNREVIEWED (0)
+</ParamField>
+
+### Size and Capacity
+
+<ParamField path="class_size_min" type="IntegerField">
+  Minimum number of students needed for class to run
+</ParamField>
+
+<ParamField path="class_size_max" type="IntegerField">
+  Maximum number of students allowed in class
+</ParamField>
+
+<ParamField path="class_size_optimal" type="IntegerField">
+  Ideal class size as specified by teacher
+</ParamField>
+
+<ParamField path="allowable_class_size_ranges" type="ManyToManyField">
+  Acceptable size ranges for this class
+  - Links to: `ClassSizeRange`
+</ParamField>
+
+### Teacher Fields
+
+<ParamField path="teachers" type="ManyToManyField">
+  Teachers/instructors for this class
+  - Links to: `ESPUser`
+  - Can have multiple co-teachers
+</ParamField>
+
+<ParamField path="allow_lateness" type="BooleanField">
+  Whether students can join after class starts
+  - Default: False
+  - If True, allows 20-minute grace period
+</ParamField>
+
+### Content Fields
+
+<ParamField path="prereqs" type="TextField">
+  Prerequisites for taking this class
+  - Text description of required background
+</ParamField>
+
+<ParamField path="grade_min" type="IntegerField">
+  Minimum grade level for students
+</ParamField>
+
+<ParamField path="grade_max" type="IntegerField">
+  Maximum grade level for students
+</ParamField>
+
+<ParamField path="hardness_rating" type="CharField">
+  Difficulty level indicator
+</ParamField>
+
+## ClassSection Model
+
+Represents a specific offering/time slot of a class.
+
+**Source:** `esp/esp/program/models/class_.py:293`
+
+### Core Fields
+
+<ParamField path="parent_class" type="ForeignKey" required>
+  The ClassSubject this section belongs to
+  - Links to: `ClassSubject`
+  - Related name: `sections`
+</ParamField>
+
+<ParamField path="status" type="IntegerField">
+  Section-specific status
+  - Choices: Same as ClassSubject
+  - Default: UNREVIEWED (0)
+</ParamField>
+
+<ParamField path="registration_status" type="IntegerField">
+  Whether registration is open for this section
+  - Choices: OPEN (0), CLOSED (10)
+  - Default: OPEN (0)
+</ParamField>
+
+<ParamField path="duration" type="DecimalField">
+  Length of section in hours
+  - Max digits: 5
+  - Decimal places: 2
+  - Example: 1.5 for 90 minutes
+</ParamField>
+
+<ParamField path="meeting_times" type="ManyToManyField">
+  Time blocks when this section meets
+  - Links to: `Event`
+  - Can span multiple time blocks
+</ParamField>
+
+<ParamField path="max_class_capacity" type="IntegerField">
+  Override capacity for this specific section
+  - If not set, uses parent class capacity
+</ParamField>
+
+<ParamField path="moderators" type="ManyToManyField">
+  Non-teacher moderators for this section
+  - Links to: `ESPUser`
+  - Separate from main teachers
+</ParamField>
+
+<ParamField path="registrations" type="ManyToManyField">
+  Students registered for this section
+  - Links to: `ESPUser`
+  - Through model: `StudentRegistration`
+</ParamField>
+
+## ClassSection Methods
+
+### Scheduling Methods
+
+<ResponseField name="start_time()" type="Event">
+  Returns the first meeting time for this section
+  
+  **Returns:** Event object or None if not scheduled
+  
+  **Example:**
+  ```python
+  section = ClassSection.objects.get(id=123)
+  start = section.start_time()
+  if start:
+      print(f"Class starts at {start.start}")
+  ```
+</ResponseField>
+
+<ResponseField name="end_time()" type="Event">
+  Returns the last meeting time for this section
+  
+  **Returns:** Event object with latest end time, or None
+</ResponseField>
+
+<ResponseField name="isScheduled()" type="bool">
+  Checks if section has assigned meeting times
+  
+  **Returns:** True if meeting_times exist
+</ResponseField>
+
+<ResponseField name="assign_start_time(first_event)">
+  Schedules the class starting at given event
+  
+  **Parameters:**
+  - `first_event` (Event): Starting time block
+  
+  **Behavior:**
+  - Automatically extends to cover class duration
+  - Clears existing rooms
+  - Attempts to reassign same rooms if available
+</ResponseField>
+
+<ResponseField name="assign_meeting_times(event_list)">
+  Manually set all meeting times for section
+  
+  **Parameters:**
+  - `event_list` (list): List of Event objects
+  
+  **Behavior:**
+  - Clears existing meeting times
+  - Adds all events in list
+</ResponseField>
+
+### Room Assignment
+
+<ResponseField name="classrooms()" type="QuerySet">
+  Returns assigned classroom resources
+  
+  **Returns:** QuerySet of Resource objects with res_type="Classroom"
+  
+  **Example:**
+  ```python
+  section = ClassSection.objects.get(id=123)
+  rooms = section.classrooms()
+  for room in rooms:
+      print(f"Room: {room.name} (capacity: {room.num_students})")
+  ```
+</ResponseField>
+
+<ResponseField name="assign_room(base_room, clear_others=False, allow_partial=False, lock=0)" type="tuple">
+  Assign a classroom to this section
+  
+  **Parameters:**
+  - `base_room` (Resource): Classroom resource to assign
+  - `clear_others` (bool): Remove other room assignments first
+  - `allow_partial` (bool): Allow partial time block coverage
+  - `lock` (int): Lock level for scheduling (0=unlocked)
+  
+  **Returns:** Tuple of (success: bool, errors: list)
+  
+  **Example:**
+  ```python
+  from esp.resources.models import Resource
+  
+  room = Resource.objects.get(name='Room 123')
+  success, errors = section.assign_room(room)
+  if not success:
+      for error in errors:
+          print(f"Error: {error}")
+  ```
+</ResponseField>
+
+<ResponseField name="clearRooms()">
+  Removes all classroom assignments from this section
+</ResponseField>
+
+<ResponseField name="prettyrooms()" type="list">
+  Returns list of room names
+  
+  **Returns:** List of strings (room names) or empty list if unscheduled
+</ResponseField>
+
+### Student Management
+
+<ResponseField name="students(verbs=['Enrolled'])" type="QuerySet">
+  Returns students with specified relationship to section
+  
+  **Parameters:**
+  - `verbs` (list): Registration types (e.g., ['Enrolled', 'Interested'])
+  
+  **Returns:** QuerySet of ESPUser objects
+  
+  **Example:**
+  ```python
+  # Get enrolled students
+  enrolled = section.students()
+  
+  # Get students who expressed interest
+  interested = section.students(verbs=['Interested'])
+  ```
+</ResponseField>
+
+<ResponseField name="num_students(verbs=['Enrolled'])" type="int">
+  Count of students in section
+  
+  **Parameters:**
+  - `verbs` (list): Registration types to count
+  
+  **Returns:** Integer count
+  
+  **Cached:** Yes
+</ResponseField>
+
+<ResponseField name="students_checked_in()" type="QuerySet">
+  Returns students currently checked in to this section
+  
+  **Returns:** QuerySet of ESPUser objects
+</ResponseField>
+
+<ResponseField name="isFull(webapp=False)" type="bool">
+  Checks if section is at capacity
+  
+  **Returns:** True if num_students >= capacity
+</ResponseField>
+
+<ResponseField name="cannotAdd(user, checkFull=True)" type="string or False">
+  Checks if user can register for this section
+  
+  **Parameters:**
+  - `user` (ESPUser): User attempting to register
+  - `checkFull` (bool): Check capacity limits
+  
+  **Returns:** Error message string if cannot add, False if can add
+  
+  **Example:**
+  ```python
+  error = section.cannotAdd(student)
+  if error:
+      print(f"Cannot register: {error}")
+  else:
+      # Proceed with registration
+      pass
+  ```
+</ResponseField>
+
+### Cancellation
+
+<ResponseField name="cancel(email_students=True, email_teachers=True, explanation=None, unschedule=False)">
+  Cancels the section and optionally notifies participants
+  
+  **Parameters:**
+  - `email_students` (bool): Send cancellation email to students
+  - `email_teachers` (bool): Send email to teachers
+  - `explanation` (str): Reason for cancellation
+  - `unschedule` (bool): Remove time and room assignments
+  
+  **Behavior:**
+  - Sets status to CANCELLED
+  - Clears student registrations
+  - Sends notification emails
+  - Optionally removes scheduling
+</ResponseField>
+
+### Properties
+
+<ResponseField name="capacity" type="int">
+  Effective capacity of the section
+  
+  **Calculation:**
+  - Uses max_class_capacity if set
+  - Otherwise uses min of: class_size_max, room capacity
+  - Applies program-specific multipliers if configured
+  
+  **Cached:** Yes
+</ResponseField>
+
+<ResponseField name="emailcode()" type="string">
+  Unique identifier for this section
+  
+  **Format:** `{parent_class_emailcode}s{section_index}`
+  
+  **Example:** "E1234s1" for first section of class E1234
+</ResponseField>
+
+<ResponseField name="title()" type="string">
+  Returns parent class title
+</ResponseField>
+
+<ResponseField name="index()" type="int">
+  Section number within parent class
+  
+  **Returns:** 1-indexed position (first section = 1)
+</ResponseField>
+
+## Usage Examples
+
+### Creating a Class with Sections
+
+```python
+from esp.program.models import Program, ClassSubject, ClassSection, ClassCategories
+from esp.users.models import ESPUser
+
+# Get program and teacher
+program = Program.objects.get(url='Splash/2024')
+teacher = ESPUser.objects.get(username='jdoe')
+category = ClassCategories.objects.get(symbol='M')  # Math
+
+# Create the class subject
+subject = ClassSubject.objects.create(
+    parent_program=program,
+    category=category,
+    title='Introduction to Calculus',
+    class_info='Learn the fundamentals of differential and integral calculus.',
+    class_size_max=25,
+    grade_min=10,
+    grade_max=12
+)
+subject.teachers.add(teacher)
+
+# Create a section
+section = ClassSection.objects.create(
+    parent_class=subject,
+    duration=1.5,  # 90 minutes
+    max_class_capacity=20
+)
+```
+
+### Scheduling a Section
+
+```python
+from esp.cal.models import Event
+from esp.resources.models import Resource
+
+section = ClassSection.objects.get(id=123)
+
+# Get time blocks
+timeslots = Event.objects.filter(
+    program=section.parent_program,
+    start__gte='2024-03-01 09:00:00'
+)
+
+# Assign meeting times
+section.assign_meeting_times(list(timeslots[:2]))  # Use first 2 blocks
+
+# Assign a classroom
+room = Resource.objects.get(name='Room 4-237')
+success, errors = section.assign_room(room)
+```
+
+### Checking Registration Eligibility
+
+```python
+student = ESPUser.objects.get(username='student123')
+section = ClassSection.objects.get(id=456)
+
+# Check if student can register
+error = section.cannotAdd(student, checkFull=True)
+
+if error:
+    print(f"Registration blocked: {error}")
+else:
+    # Create registration (see Registration model docs)
+    from esp.program.models import StudentRegistration, RegistrationType
+    
+    reg_type = RegistrationType.objects.get(name='Enrolled')
+    StudentRegistration.objects.create(
+        section=section,
+        user=student,
+        relationship=reg_type
+    )
+```
+
+### Getting Class Information
+
+```python
+section = ClassSection.objects.get(id=789)
+
+print(f"Class: {section.title()}")
+print(f"Code: {section.emailcode()}")
+print(f"Capacity: {section.capacity}")
+print(f"Enrolled: {section.num_students()}")
+print(f"Rooms: {', '.join(section.prettyrooms())}")
+
+if section.isScheduled():
+    print(f"Starts: {section.start_time().start}")
+    print(f"Ends: {section.end_time().end}")
+```
+
+## Related Models
+
+- [Program](/api/models/program) - Parent program containing classes
+- [User](/api/models/user) - Teachers and students
+- [Registration](/api/models/registration) - Student enrollments
+- [Resources](/api/models/resources) - Classrooms and equipment

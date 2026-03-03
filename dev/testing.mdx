@@ -1,0 +1,670 @@
+---
+title: Testing
+description: Guide to running tests, writing test cases, and using the ESP Website test framework
+---
+
+This guide covers testing practices for the ESP Website project, including running the test suite, writing new tests, and understanding the testing infrastructure.
+
+## Overview
+
+ESP Website uses Django's built-in test framework with custom utilities for cache management and user role setup. All tests must pass before submitting a pull request.
+
+<Warning>
+**All tests must pass before submitting a pull request.** If your changes break existing tests, fix them before requesting a review. When adding new functionality, add corresponding tests.
+</Warning>
+
+## Running Tests
+
+### Using Docker (Recommended)
+
+The Docker environment provides the most consistent testing experience:
+
+```bash
+# Run all tests
+docker compose exec web python esp/manage.py test
+
+# Run tests for a specific app
+docker compose exec web python esp/manage.py test esp.accounting.tests
+
+# Run tests for a specific module
+docker compose exec web python esp/manage.py test esp.program.tests
+
+# Run a specific test class
+docker compose exec web python esp/manage.py test esp.program.tests.ViewUserInfoTest
+
+# Run with verbose output
+docker compose exec web python esp/manage.py test --verbosity=2
+```
+
+### Without Docker
+
+If running the server natively:
+
+```bash
+cd esp
+python manage.py test --settings=esp.settings
+
+# Run specific tests
+python manage.py test esp.accounting.tests --settings=esp.settings
+```
+
+### Running with Coverage
+
+To generate test coverage reports:
+
+```bash
+# With Docker
+docker compose exec web coverage run --source=. esp/manage.py test
+docker compose exec web coverage report
+docker compose exec web coverage html  # Generates HTML report
+
+# Without Docker
+cd esp
+coverage run --source=. ./manage.py test
+coverage report
+coverage xml  # For CI/CD integration
+```
+
+## Test Structure
+
+Tests are organized by Django app and typically located in:
+
+- `tests.py` files within each app directory
+- `tests/` directories for larger test suites
+
+### Test Locations
+
+**Application-level tests**:
+- `esp/accounting/tests.py`
+- `esp/application/tests.py`
+- `esp/cal/tests.py`
+- `esp/dbmail/tests.py`
+- `esp/formstack/tests.py`
+- `esp/miniblog/tests.py`
+- `esp/program/tests.py`
+- `esp/survey/tests.py`
+- `esp/varnish/tests.py`
+
+**Tests in subdirectories**:
+- `esp/accounting/tests/` - Accounting module tests
+- `esp/program/modules/tests/` - Program module tests
+- `esp/program/controllers/autoscheduler/tests/` - Autoscheduler tests
+- `esp/users/controllers/tests/` - User search and controller tests
+- `esp/tests/` - Core framework tests
+
+**Key test modules**:
+- `esp/customforms/tests.py`
+- `esp/resources/tests.py`
+- `esp/qsd/tests.py`
+- `esp/qsdmedia/tests.py`
+- `esp/tagdict/tests.py`
+- `esp/themes/tests.py`
+- `esp/utils/tests.py`
+- `esp/web/tests.py`
+
+## Writing Tests
+
+### Basic Test Structure
+
+ESP tests inherit from `CacheFlushTestCase` which handles cache cleanup:
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase
+from esp.users.models import ESPUser
+
+class MyFeatureTest(TestCase):
+    def setUp(self):
+        """ Set up test data """
+        self.user = ESPUser.objects.create(
+            username='testuser',
+            first_name='Test',
+            last_name='User',
+            email='test@example.com'
+        )
+        self.user.set_password('testpass')
+        self.user.save()
+    
+    def test_user_creation(self):
+        """ Test that users are created correctly """
+        self.assertEqual(self.user.username, 'testuser')
+        self.assertTrue(self.user.check_password('testpass'))
+    
+    def test_user_roles(self):
+        """ Test user role assignment """
+        self.user.makeRole('Teacher')
+        self.assertTrue(self.user.isTeacher())
+```
+
+### Using CacheFlushTestCase
+
+The `CacheFlushTestCase` base class automatically flushes the cache before and after each test:
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase
+
+class CachedDataTest(TestCase):
+    """ Cache is automatically flushed between tests """
+    
+    def test_caching_behavior(self):
+        # Cache is clean at the start of this test
+        from django.core.cache import cache
+        cache.set('test_key', 'test_value')
+        self.assertEqual(cache.get('test_key'), 'test_value')
+    
+    def test_cache_isolation(self):
+        # Cache from previous test is not present
+        from django.core.cache import cache
+        self.assertIsNone(cache.get('test_key'))
+```
+
+### Setting Up User Roles
+
+Use the `user_role_setup` utility to create necessary user groups:
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase, user_role_setup
+from esp.users.models import ESPUser
+
+class UserRoleTest(TestCase):
+    def setUp(self):
+        # Create all standard user role groups
+        user_role_setup()
+        
+        self.teacher = ESPUser.objects.create(username='teacher')
+        self.teacher.makeRole('Teacher')
+        
+        self.student = ESPUser.objects.create(username='student')
+        self.student.makeRole('Student')
+    
+    def test_teacher_permissions(self):
+        self.assertTrue(self.teacher.isTeacher())
+        self.assertFalse(self.teacher.isStudent())
+```
+
+Available roles:
+- `Student`
+- `Teacher`
+- `Educator`
+- `Guardian`
+- `Volunteer`
+- `Administrator`
+
+### Testing Views
+
+Test HTTP views using Django's test client:
+
+```python
+from django.test.client import Client
+from esp.tests.util import CacheFlushTestCase as TestCase
+from esp.users.models import ESPUser
+
+class ViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = ESPUser.objects.create_user(
+            username='testuser',
+            password='testpass',
+            email='test@example.com'
+        )
+    
+    def test_login_required(self):
+        """ Test that view requires authentication """
+        response = self.client.get('/manage/programs/')
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+    
+    def test_authenticated_access(self):
+        """ Test authenticated user can access view """
+        self.client.login(username='testuser', password='testpass')
+        response = self.client.get('/myesp/profile/')
+        self.assertEqual(response.status_code, 200)
+    
+    def test_post_data(self):
+        """ Test form submission """
+        self.client.login(username='testuser', password='testpass')
+        response = self.client.post('/myesp/profile/edit/', {
+            'first_name': 'Updated',
+            'last_name': 'Name',
+        })
+        self.assertEqual(response.status_code, 200)
+```
+
+### Testing Models
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase
+from esp.program.models import Program, ClassSubject
+from esp.users.models import ESPUser
+from datetime import datetime
+
+class ProgramModelTest(TestCase):
+    def setUp(self):
+        self.program = Program.objects.create(
+            name='Test Splash',
+            url='testsplash',
+            program_type='Splash',
+            program_size_max=500
+        )
+    
+    def test_program_creation(self):
+        self.assertEqual(self.program.name, 'Test Splash')
+        self.assertEqual(self.program.url, 'testsplash')
+    
+    def test_class_creation(self):
+        teacher = ESPUser.objects.create_user(
+            username='teacher',
+            email='teacher@example.com'
+        )
+        
+        subject = ClassSubject.objects.create(
+            title='Introduction to Testing',
+            category=self.program.default_category,
+            parent_program=self.program,
+            grade_min=9,
+            grade_max=12,
+        )
+        subject.makeTeacher(teacher)
+        
+        self.assertEqual(subject.title, 'Introduction to Testing')
+        self.assertIn(teacher, subject.teachers())
+```
+
+### Testing with Program Data
+
+For tests requiring complex program setups:
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase, user_role_setup
+from esp.program.models import Program
+from esp.program.setup import prepare_program, commit_program
+from datetime import datetime, timedelta
+
+class ProgramTest(TestCase):
+    def setUp(self):
+        user_role_setup()
+        
+        # Create a program with standard setup
+        self.program = Program.objects.create(
+            name='Test Program',
+            url='testprog',
+            program_type='Splash'
+        )
+        
+        # Set up program dates
+        start_date = datetime.now() + timedelta(days=30)
+        end_date = start_date + timedelta(days=2)
+        
+        prepare_program(self.program, start_date, end_date)
+        commit_program(self.program)
+    
+    def test_program_modules(self):
+        """ Test that program modules are initialized """
+        modules = self.program.getModules()
+        self.assertGreater(len(modules), 0)
+```
+
+### Testing Permissions
+
+```python
+from esp.tests.util import CacheFlushTestCase as TestCase
+from esp.users.models import ESPUser, Permission
+
+class PermissionTest(TestCase):
+    def setUp(self):
+        self.user = ESPUser.objects.create_user(username='testuser')
+    
+    def test_admin_permission(self):
+        """ Test admin permission assignment """
+        self.user.makeRole('Administrator')
+        self.assertTrue(self.user.isAdministrator())
+    
+    def test_program_permission(self):
+        """ Test program-specific permissions """
+        from esp.program.models import Program
+        
+        program = Program.objects.create(
+            name='Test',
+            url='test',
+            program_type='Splash'
+        )
+        
+        # Grant user permission for this program
+        Permission.objects.create(
+            user=self.user,
+            permission_type='Administer',
+            program=program
+        )
+        
+        self.assertTrue(
+            self.user.isAdmin(program)
+        )
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+ESP Website uses GitHub Actions for continuous integration:
+
+**Test Workflow** (`.github/workflows/tests.yml`):
+```yaml
+name: "Unit Tests"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: test_django
+      memcached:
+        image: memcached:alpine
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.7
+      uses: deadsnakes/action@v3.2.0
+    - name: Install Dependencies
+      run: deploy/ci/install
+    - name: Run Tests
+      run: deploy/ci/script
+    - name: Upload Coverage
+      uses: codecov/codecov-action@v5
+```
+
+### CI Scripts
+
+The `deploy/ci/` directory contains CI automation scripts:
+
+**Install Dependencies** (`deploy/ci/install`):
+```bash
+#!/bin/bash
+set -euf -o pipefail
+
+if [ "$CI_JOB" = "test" ]; then
+    # Install system packages
+    sudo apt-get install -y $(cat esp/packages_base.txt | grep -v ^memcached | grep -v ^postgres)
+    
+    # Install Python dependencies
+    pip3 install -r esp/requirements.txt
+    pip3 install coverage
+fi
+```
+
+**Before Script** (`deploy/ci/before_script`):
+```bash
+#!/bin/bash
+set -euf -o pipefail
+
+if [ "$CI_JOB" = "test" ]; then
+    # Copy CI settings
+    cp esp/esp/local_settings.py.ci esp/esp/local_settings.py
+    
+    # Create media symlinks
+    ln -s `pwd`/esp/public/media/default_images esp/public/media/images
+    ln -s `pwd`/esp/public/media/default_styles esp/public/media/styles
+fi
+```
+
+**Run Tests** (`deploy/ci/script`):
+```bash
+#!/bin/bash
+set -euf -o pipefail
+
+if [ "$CI_JOB" = "test" ]; then
+    cd esp
+    ./manage.py collectstatic --noinput -v 0
+    coverage run --source=. ./manage.py test
+    coverage xml
+fi
+```
+
+### Test Configuration
+
+CI tests use `esp/esp/local_settings.py.ci`:
+
+```python
+SITE_INFO = (1, 'testserver.learningu.org', 'ESP Test Server')
+CACHE_PREFIX = "Test"
+SECRET_KEY = 'test-secret-key'
+
+DATABASE_NAME = 'test_django'
+DATABASE_USER = 'testuser'
+DATABASE_PASSWORD = 'testpassword'
+
+DEBUG = True
+USE_MAILMAN = False
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+```
+
+## Linting
+
+Code style is enforced using flake8:
+
+```bash
+# Run linting locally
+./deploy/lint
+
+# Check only staged files
+./deploy/lint --staged
+
+# With Docker
+docker compose exec web bash -c "cd /app && deploy/lint"
+```
+
+The lint script checks for:
+- `E101`: Mixed tabs and spaces
+- `F82x`: Undefined names, variables referenced before assignment
+- `F831`: Duplicate arguments in function definitions
+- `W191`: Indentation contains tabs
+- `W29x`: Whitespace issues
+- `W601`: `has_key` instead of `in`
+- `W603`: `<>` instead of `!=`
+- `W604`: Backticks instead of `repr`
+
+### Lint Workflow
+
+GitHub Actions runs linting on all PRs:
+
+```yaml
+name: "Lint"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install flake8
+      run: pip install flake8
+    - name: Run lint
+      run: deploy/lint
+```
+
+## Test Database
+
+Django automatically creates a test database (prefixed with `test_`) for each test run:
+
+- Development: `test_devsite_django`
+- CI: `test_test_django`
+
+The test database is:
+- Created before tests run
+- Populated with migrations
+- Destroyed after tests complete
+- Isolated from your development database
+
+<Note>
+Django creates and destroys the test database automatically. You don't need to manage it manually.
+</Note>
+
+## Best Practices
+
+### Test Isolation
+
+- Each test should be independent
+- Don't rely on test execution order
+- Clean up test data in `tearDown()` if needed
+- Use `CacheFlushTestCase` to prevent cache pollution
+
+### Naming Conventions
+
+```python
+class FeatureTest(TestCase):
+    def test_specific_behavior(self):
+        """ Test docstrings describe what is being tested """
+        pass
+    
+    def test_edge_case_handling(self):
+        """ Test edge cases and error conditions """
+        pass
+```
+
+### Test Coverage Goals
+
+- Test all public methods and functions
+- Cover both success and failure cases
+- Test edge cases and boundary conditions
+- Test permission checks and authentication
+- Test data validation and form processing
+
+### What to Test
+
+**Do test**:
+- Business logic in models and views
+- Permission and authentication checks
+- Form validation
+- Custom template tags and filters
+- API endpoints
+- Database constraints
+
+**Don't test**:
+- Django framework functionality
+- Third-party library behavior
+- Simple property getters/setters
+- Configuration values
+
+### Assertions
+
+Common assertions used in ESP tests:
+
+```python
+# Equality
+self.assertEqual(actual, expected)
+self.assertNotEqual(actual, unexpected)
+
+# Truthiness
+self.assertTrue(condition)
+self.assertFalse(condition)
+self.assertIsNone(value)
+self.assertIsNotNone(value)
+
+# Membership
+self.assertIn(item, container)
+self.assertNotIn(item, container)
+
+# Exceptions
+with self.assertRaises(ValueError):
+    function_that_raises()
+
+# HTTP responses
+self.assertEqual(response.status_code, 200)
+self.assertContains(response, 'expected text')
+self.assertRedirects(response, '/expected/url/')
+
+# Querysets
+self.assertQuerysetEqual(qs1, qs2)
+
+# Custom ESP assertions
+self.assertStringContains(string, 'substring')
+self.assertNotStringContains(string, 'substring')
+```
+
+## Debugging Tests
+
+### Print Debug Output
+
+```python
+class DebugTest(TestCase):
+    def test_with_debug(self):
+        result = some_function()
+        print(f"Result: {result}")  # Visible with --verbosity=2
+        self.assertEqual(result, expected)
+```
+
+Run with verbose output:
+```bash
+python manage.py test --verbosity=2 esp.app.tests.DebugTest
+```
+
+### Use Python Debugger
+
+```python
+import pdb
+
+class DebugTest(TestCase):
+    def test_with_debugger(self):
+        some_setup()
+        pdb.set_trace()  # Execution pauses here
+        result = function_to_debug()
+        self.assertEqual(result, expected)
+```
+
+### Isolate Failing Tests
+
+```bash
+# Run only the failing test
+python manage.py test esp.app.tests.FailingTest.test_specific_method
+
+# Run with keep database to inspect data
+python manage.py test --keepdb esp.app.tests
+```
+
+## Performance Testing
+
+For performance-critical code:
+
+```python
+import time
+from esp.tests.util import CacheFlushTestCase as TestCase
+
+class PerformanceTest(TestCase):
+    def test_query_performance(self):
+        """ Test that queries complete in reasonable time """
+        from django.test.utils import override_settings
+        
+        start = time.time()
+        result = expensive_query()
+        duration = time.time() - start
+        
+        self.assertLess(duration, 1.0)  # Should complete in < 1 second
+    
+    def test_query_count(self):
+        """ Test that view doesn't perform too many queries """
+        from django.test.utils import override_settings
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get('/some/view/')
+        
+        # Should not exceed 10 queries
+        self.assertLess(len(context.captured_queries), 10)
+```
+
+## Related Documentation
+
+- [Contributing Guide](/dev/contributing)
+- [Development Setup](/dev/setup)
+- [Deployment Guide](/dev/deploying)
+- [Django Testing Documentation](https://docs.djangoproject.com/en/stable/topics/testing/)

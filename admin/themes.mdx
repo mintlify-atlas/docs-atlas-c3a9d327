@@ -1,0 +1,448 @@
+---
+title: Theme Customization
+description: Configure the appearance and navigation of your ESP Website with themes
+---
+
+The ESP Website uses a theming system to control the visual appearance and navigation structure of your site. Themes provide pre-designed layouts that you can customize with your own colors, logos, and content.
+
+## Accessing the Themes App
+
+The themes configuration interface is available at:
+
+```
+https://[yoursite].learningu.org/themes/
+```
+
+Behind the scenes, the themes app generates template overrides and CSS stylesheets based on your configuration.
+
+## Three-Step Setup Process
+
+Theming involves three main steps:
+
+<Steps>
+  <Step title="Select a Theme">
+    Choose from pre-defined layouts at `/themes/select/`
+  </Step>
+  
+  <Step title="Set Up the Theme">
+    Provide required information at `/themes/setup/`
+  </Step>
+  
+  <Step title="Customize Appearance">
+    Define colors and styles at `/themes/customize/`
+  </Step>
+</Steps>
+
+---
+
+## Step 1: Selecting a Theme
+
+Navigate to `/themes/select/` to choose from available themes. Each theme offers different navigation structures and visual styles suited to different types of organizations.
+
+### Available Themes
+
+<Accordion title="barebones">
+**Best for**: Simple sites needing minimal setup
+
+The simplest available theme with no fancy design elements. Requires little configuration and provides a clean, functional interface.
+
+**Features**:
+- Minimal navigation
+- No theme images required
+- Fast to set up
+- Good for new chapters or testing
+</Accordion>
+
+<Accordion title="droplets">
+**Best for**: Modern, mobile-friendly sites
+
+The newest theme with the most modern appearance and reactive design.
+
+**Features**:
+- Uses screen width better than bigpicture
+- Mobile-friendly responsive design
+- Requires setup (header image, navigation)
+- Great for new chapters wanting a polished look
+
+**Example**: Splash at Yale
+</Accordion>
+
+<Accordion title="bigpicture">
+**Best for**: Sites wanting visual impact
+
+Popular modern theme based on Splash at Berkeley's design.
+
+**Features**:
+- Large header image
+- Foreground logo overlay
+- Modern aesthetic
+- Requires setup (images, navigation)
+- Still great for new chapters
+
+**Example**: Splash at Berkeley
+
+**Author**: Sean Zhu
+</Accordion>
+
+<Accordion title="circles">
+**Best for**: Small chapters with simple needs
+
+Historically popular for small chapters. Simple navigation with customizable appearance.
+
+**Features**:
+- Logo slot
+- Fairly simple navigation structure
+- Several customization options
+- Good for small to medium sites
+
+**Original use**: Chicago Splash
+
+**Example**: BC Splash
+</Accordion>
+
+<Accordion title="fruitsalad">
+**Best for**: Large organizations with multiple programs
+
+Most complex navigation options, designed for MIT ESP's many programs.
+
+**Navigation levels**:
+1. Top tabs ("learn", "teach")
+2. Side tabs (programs or pages)
+3. Navbar below page title (within sections)
+
+**Features**:
+- Logo and optional "bubbles" front page
+- Supports complex site structures
+- Can be overly complicated for simpler sites
+
+**Best for**: Organizations running several different programs simultaneously
+</Accordion>
+
+<Accordion title="floaty">
+**Best for**: Sites wanting middle-ground complexity
+
+Fancier than barebones, more modern than circles, with moderate navigation complexity.
+
+**Features**:
+- Logo slot
+- Moderate navigation structure
+- Somewhat modern design
+
+**Note**: Least common and least well-maintained theme
+</Accordion>
+
+### Switching Themes
+
+<Warning>
+Before switching themes:
+
+1. **Save your logo**: Download from the filebrowser
+2. **Save template overrides**: Back up modifications to `main.html` and `index.html`
+3. **Switching will overwrite** these files
+
+If you don't know what template overrides are, you probably don't have any modifications to worry about.
+</Warning>
+
+After loading a new theme:
+
+<Note>
+**Force-refresh** the page (Shift + refresh) to retrieve updated stylesheets and see the new design.
+</Note>
+
+If there's a problem loading a theme, contact web support.
+
+---
+
+## Step 2: Theme Setup
+
+Navigate to `/themes/setup/` to provide information required by your selected theme.
+
+### Common Setup Fields
+
+Most themes require:
+
+<Accordion title="Text Fragments">
+- **Page title**: Your organization name (appears in browser tab and header)
+- **Group name**: Your chapter or organization name
+- **Contact information**: Email, phone, address for footer
+- **Tagline or description**: Brief text about your organization
+</Accordion>
+
+<Accordion title="Navigation Links">
+Some themes (bigpicture, droplets, fruitsalad) have customizable navigation:
+
+- Define menu items and their URLs
+- Organize into sections (top-level tabs, side menus)
+- Link to programs, static pages, or external sites
+
+The setup form will guide you through what's needed for your specific theme.
+</Accordion>
+
+### Theme-Specific Requirements
+
+Each theme may request different information:
+
+- **barebones**: Minimal (just basic site info)
+- **circles/floaty**: Logo, basic navigation
+- **bigpicture/droplets**: Header image, logo, navigation structure
+- **fruitsalad**: Multi-level navigation configuration
+
+Complete all required fields to ensure your theme displays properly.
+
+---
+
+## Step 3: Customize Appearance
+
+Navigate to `/themes/customize/` to personalize your theme's visual appearance without affecting functionality.
+
+### Color Customization
+
+The customization form has multiple sections:
+
+<Steps>
+  <Step title="Define Palette">
+    In the "Palette" section, define your base colors:
+    - Primary color
+    - Secondary color  
+    - Accent colors
+    - Background colors
+    - Text colors
+  </Step>
+  
+  <Step title="Apply to Elements">
+    In subsequent sections, assign colors to specific elements:
+    - Headers and navigation
+    - Buttons and links
+    - Backgrounds and borders
+    - Hover states
+  </Step>
+  
+  <Step title="Set Shapes">
+    Configure visual properties:
+    - Border radius (rounded corners)
+    - Spacing
+    - Font sizes
+    - Shadow effects
+  </Step>
+</Steps>
+
+### Saving Customizations
+
+You can **save and load** collections of customizations:
+
+- Save your color scheme with a name
+- Load saved schemes later
+- Useful for seasonal changes or different programs
+- Switch between multiple saved styles easily
+
+<Note>
+After saving changes, **force-refresh** (Shift + refresh) the page to see the updated color scheme.
+</Note>
+
+### Theme Images
+
+Each theme has standard image slots:
+
+<Accordion title="barebones">
+No theme images required.
+</Accordion>
+
+<Accordion title="bigpicture">
+- **Background picture**: Large header image
+- **Logo**: Foreground overlay on background
+</Accordion>
+
+<Accordion title="circles & floaty">
+- **Logo**: Site logo
+</Accordion>
+
+<Accordion title="droplets">
+- **Header image**: Top banner
+- **Logo**: Site branding
+</Accordion>
+
+<Accordion title="fruitsalad">
+- **Logo**: Site branding
+- **Bubbles** (optional): Front page graphic
+</Accordion>
+
+### Uploading Theme Images
+
+<Steps>
+  <Step title="Access Filebrowser">
+    Click "Manage Media Files" in the admin toolbar (left side of screen)
+  </Step>
+  
+  <Step title="Navigate to Theme Folder">
+    1. Click the "images" folder
+    2. Click the "theme" folder
+    3. Find the current image (usually `logo.png`)
+  </Step>
+  
+  <Step title="Note Dimensions">
+    Check the size of the existing image. Your new image should have similar dimensions to avoid layout issues.
+  </Step>
+  
+  <Step title="Delete Old Image">
+    1. Click "Change" next to the file
+    2. Click "Delete" in the bottom left corner
+  </Step>
+  
+  <Step title="Upload New Image">
+    Upload your image to the same folder
+  </Step>
+  
+  <Step title="Rename to Match">
+    1. Click "Change" next to your uploaded image
+    2. Set the "name" field to match the original (e.g., `logo.png`)
+  </Step>
+  
+  <Step title="Force Refresh">
+    Force-refresh (Shift + refresh) the page to see the new image
+  </Step>
+</Steps>
+
+<Warning>
+Images should not differ dramatically in size or shape from the originals. This can break the theme layout.
+</Warning>
+
+---
+
+## Manual Theming
+
+You're not required to use the themes app. You can manually:
+
+- Edit template overrides directly
+- Upload custom media files
+- Write custom CSS
+- Control appearance however you prefer
+
+<Warning>
+**Before experimenting with manual theming**:
+
+Loading a theme through the themes app will delete or overwrite your manual template overrides. Keep backups of any customizations.
+</Warning>
+
+The themes app provides a simplified alternative. The goal is for all sites to eventually use it as their designs are added to the repository as themes.
+
+### Template Overrides
+
+Key templates you might override:
+
+- `main.html`: Overall page structure
+- `index.html`: Homepage layout
+- Theme-specific templates in `/templates/themes/[theme_name]/`
+
+Template overrides go in your site's custom templates directory.
+
+### Custom CSS
+
+Add custom styles by:
+
+1. Creating a CSS file in `/media/styles/`
+2. Including it in your template overrides
+3. Or using the themes customization to generate CSS
+
+---
+
+## Best Practices
+
+### For New Chapters
+
+<Steps>
+  <Step title="Start with droplets or bigpicture">
+    Modern, well-maintained themes that look professional
+  </Step>
+  
+  <Step title="Prepare images in advance">
+    - Logo: PNG with transparent background
+    - Header/background: High resolution, appropriate dimensions
+  </Step>
+  
+  <Step title="Use simple navigation initially">
+    Add complexity as your site grows
+  </Step>
+  
+  <Step title="Save your customization">
+    Create a saved color scheme so you can restore it if needed
+  </Step>
+</Steps>
+
+### For Established Sites
+
+If you're currently using manual template overrides:
+
+1. **Contact web support** about creating a theme from your current design
+2. Or transition gradually by backing up current templates first
+3. Consider whether a standard theme might simplify maintenance
+
+### Seasonal or Event-Based Changes
+
+1. Create and save multiple color schemes
+2. Keep multiple versions of theme images
+3. Switch between saved configurations easily
+4. Change colors for holidays, special programs, etc.
+
+---
+
+## Troubleshooting
+
+<Accordion title="Changes aren't appearing">
+**Solution**: Force-refresh the page (Shift + refresh) to clear cached CSS and images.
+</Accordion>
+
+<Accordion title="Navigation isn't working">
+**Check**:
+- URLs are correct in theme setup
+- Pages you're linking to exist
+- Navigation structure is appropriate for your theme
+</Accordion>
+
+<Accordion title="Images look stretched or broken">
+**Fix**:
+- Replace with image of correct dimensions
+- Check original image size before deleting
+- Ensure image file is named correctly
+</Accordion>
+
+<Accordion title="Colors aren't applying">
+**Try**:
+- Save customization changes
+- Force-refresh browser
+- Clear browser cache completely
+- Check if manual CSS is overriding theme CSS
+</Accordion>
+
+<Accordion title="Theme won't load">
+**Contact**: websupport@learningu.org with:
+- Which theme you're trying to load
+- Error message (if any)
+- Your site URL
+</Accordion>
+
+---
+
+## Getting Help
+
+<Note>
+For theme customization assistance, contact:
+
+**websupport@learningu.org**
+
+Provide:
+- Your site URL
+- Current theme
+- What you're trying to achieve
+- Screenshots if helpful
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Programs" href="./creating-programs">
+    Set up programs after configuring your theme
+  </Card>
+  <Card title="Admin Overview" href="./overview">
+    Learn about managing your programs
+  </Card>
+</CardGroup>

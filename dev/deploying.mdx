@@ -1,0 +1,443 @@
+---
+title: Deployment
+description: Guide to deploying ESP Website to production and setting up new servers
+---
+
+This guide covers deploying the ESP Website platform to production servers, including setting up new sites, managing existing deployments, and server maintenance.
+
+## Deployment Overview
+
+ESP Website deployments follow a traditional server-based model using Apache with mod_wsgi, PostgreSQL, and Exim4 for email. Each chapter site runs in its own directory under `/lu/sites` with shared system dependencies.
+
+### Production Architecture
+
+- **Web Server**: Apache 2.x with mod_wsgi
+- **Database**: PostgreSQL 14+
+- **Cache**: Memcached
+- **Email**: Exim4 with mailgate support
+- **OS**: Ubuntu 22.04 LTS (current supported version)
+
+## Deploying a New Site
+
+To deploy a new chapter site, you'll need the following information:
+
+1. The hostname the chapter prefers
+2. The chapter's contact email address
+3. The group's name (e.g., "MIT ESP" or "Yale Splash")
+4. The chapter's preferred theme
+
+### Deployment Steps
+
+1. SSH to the production server:
+   ```bash
+   ssh production-server
+   cd /lu/sites
+   ```
+
+2. Run the site setup script:
+   ```bash
+   sudo new_site.sh --all
+   ```
+
+3. Follow the interactive prompts to configure:
+   - Site directory name (choose something short and unique)
+   - Database credentials
+   - Site settings
+   - Initial superuser account
+
+<Note>
+If the directory already exists for the chapter, you may wish to delete it first to get a clean start. Alternatively, clone the repository yourself, `cd` into it, and run the script from there.
+</Note>
+
+### Troubleshooting Setup
+
+If something fails during setup:
+
+- Re-run specific steps using appropriate flags with `new_site.sh`
+- Note that some steps won't work if run twice
+- The script remembers your settings; just specify the same directory
+- Manually run migrations if needed:
+  ```bash
+  python manage.py migrate
+  ```
+
+### Post-Deployment
+
+After successfully deploying:
+
+1. Email the chapter with:
+   - Confirmation that their site is ready
+   - Instructions for creating accounts
+   - Documentation links (repository docs, LU wiki, websupport)
+   - Any theme configuration notes
+
+## Configuration Files
+
+### Local Settings
+
+Each site has a `local_settings.py` file that overrides default Django settings. Key configuration:
+
+```python
+SITE_INFO = (1, 'yoursite.learningu.org', 'Your Chapter Name')
+CACHE_PREFIX = "yoursite"
+
+DATABASES = {'default': {
+    'NAME': 'yoursite_django',
+    'HOST': 'localhost',
+    'PORT': '5432',
+    'ENGINE': 'django.db.backends.postgresql_psycopg2',
+    'USER': 'dbuser',
+    'PASSWORD': 'dbpassword',
+}}
+
+SECRET_KEY = 'generate-unique-secret-key'
+ALLOWED_HOSTS = ['yoursite.learningu.org']
+```
+
+### Apache Configuration
+
+Apache virtual host configuration template (`/etc/apache2/sites-available/esp_sites.conf`):
+
+```apache
+<VirtualHost *:80>
+    ServerName yoursite.learningu.org
+    ServerAdmin admin@yoursite.org
+
+    WSGIDaemonProcess yoursite user=espuser group=espuser processes=4 threads=2
+    WSGIProcessGroup yoursite
+    WSGIScriptAlias / /lu/sites/yoursite/esp.wsgi
+
+    <Directory /lu/sites/yoursite>
+        Order deny,allow
+        allow from all
+    </Directory>
+
+    ErrorLog /var/log/apache2/yoursite-error.log
+    LogLevel error
+</VirtualHost>
+```
+
+### WSGI Configuration
+
+The `esp.wsgi` file handles Django application loading:
+
+```python
+import os
+import sys
+
+os.environ['DJANGO_SETTINGS_MODULE'] = 'esp.settings'
+
+BASEDIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(BASEDIR, 'esp'))
+
+# Activate virtualenv if present
+if os.environ.get('VIRTUAL_ENV') is None:
+    activate_this = os.path.join(BASEDIR, 'env/bin/activate_this.py')
+    with open(activate_this, 'rb') as source_file:
+        code = compile(source_file.read(), activate_this, 'exec')
+    exec(code, dict(__file__=activate_this))
+
+import django.core.wsgi
+application = django.core.wsgi.get_wsgi_application()
+```
+
+## Managing Deployments
+
+### Pulling New Code
+
+For production updates:
+
+1. Navigate to the site directory:
+   ```bash
+   cd /lu/sites/yoursite
+   ```
+
+2. Pull latest changes:
+   ```bash
+   git pull origin main
+   ```
+
+3. Update dependencies:
+   ```bash
+   ./esp/update_deps.sh
+   ```
+
+4. Run migrations:
+   ```bash
+   cd esp
+   python manage.py migrate
+   ```
+
+5. Collect static files:
+   ```bash
+   python manage.py collectstatic --noinput
+   ```
+
+6. Reload Apache:
+   ```bash
+   sudo systemctl reload apache2
+   ```
+
+### Urgent Fixes (MIT-Specific)
+
+For urgent production fixes that can't wait for full review:
+
+```bash
+git pull
+git checkout $(git merge-base main mit-prod)
+git checkout -b urgent-branch-name
+
+# Make changes and test carefully
+git commit -a -m "Urgent fix description"
+git push --set-upstream origin urgent-branch-name
+
+git checkout mit-prod
+git merge urgent-branch-name
+git push
+```
+
+Then pull to production and create a PR to main for proper review.
+
+## Setting Up a New Server
+
+When replacing or setting up a new production host:
+
+### 1. Install Base System
+
+```bash
+# Start with Ubuntu 22.04 LTS
+sudo apt update
+sudo apt upgrade
+```
+
+### 2. Install System Dependencies
+
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+
+# Install core dependencies
+sudo apt install -y \
+  postgresql postgresql-contrib \
+  apache2 libapache2-mod-wsgi-py3 \
+  exim4 \
+  python3.7 python3-pip \
+  git memcached
+```
+
+### 3. Configure Services
+
+**PostgreSQL**:
+```bash
+sudo -u postgres createuser -P espuser
+sudo -u postgres createdb -O espuser production_django
+```
+
+**Apache**:
+```bash
+sudo a2enmod wsgi
+sudo systemctl enable apache2
+```
+
+**Exim4**:
+- Configure for internet site with smarthost if needed
+- Set up mailgate configuration in `/etc/exim4/conf.d`
+
+### 4. Migrate Site Data
+
+From the old server:
+
+1. **Copy site directories**:
+   ```bash
+   rsync -avz --progress /lu/sites/ newserver:/lu/sites/
+   ```
+
+2. **Copy configuration files**:
+   - `/etc/apache2/sites-available/esp_sites.conf`
+   - `/etc/crontab`
+   - `/etc/exim4/update-exim4.conf.conf`
+   - Any custom files under `/etc/exim4/conf.d`
+
+3. **Dump and restore databases**:
+   ```bash
+   # On old server
+   pg_dump -U espuser production_django > production_dump.sql
+   
+   # On new server
+   psql -U espuser production_django < production_dump.sql
+   ```
+
+### 5. Enable Services
+
+```bash
+# Enable Apache site configurations
+sudo a2ensite esp_sites
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+
+# Update and reload Exim
+sudo update-exim4.conf
+sudo systemctl reload exim4
+
+# Ensure cron is running
+sudo systemctl enable cron
+```
+
+### 6. Validate Deployment
+
+For each chapter site:
+
+1. Run migrations:
+   ```bash
+   cd /lu/sites/sitename/esp
+   python manage.py migrate
+   ```
+
+2. Test key functionality:
+   - User login and admin interface
+   - Representative program pages
+   - Outbound email delivery
+
+3. Monitor logs:
+   ```bash
+   tail -f /var/log/apache2/*-error.log
+   ```
+
+### 7. DNS and TLS
+
+Before final cutover:
+
+- Verify DNS A records point to new server
+- Set up TLS certificates (Let's Encrypt recommended)
+- Verify MX records for email delivery
+- Test from external networks
+
+### 8. Cutover Strategy
+
+1. Choose a low-traffic window
+2. Update DNS to point to new server
+3. Monitor logs and error rates closely
+4. Keep old server available for quick rollback
+5. After 24-48 hours of stability, decommission old server
+
+## Deactivating a Site
+
+To deactivate a chapter site:
+
+1. Comment out or remove site configuration:
+   - Lines in `/etc/apache2/sites-available/esp_sites.conf`
+   - Cron jobs in `/etc/crontab`
+   - Email routing in `/etc/exim4/update-exim4.conf.conf`
+
+2. Archive the site directory:
+   ```bash
+   sudo mv /lu/sites/sitename /lu/sites/archive/
+   ```
+
+3. Reload services:
+   ```bash
+   sudo systemctl reload apache2
+   sudo update-exim4.conf
+   sudo systemctl reload exim4
+   ```
+
+<Warning>
+Always back up site data and databases before deactivating. Consider keeping archives for at least 1 year.
+</Warning>
+
+## Docker Deployment (Development)
+
+For local development, use Docker Compose:
+
+```bash
+git clone https://github.com/learning-unlimited/ESP-Website.git devsite
+cd devsite
+docker compose up --build
+```
+
+The Docker setup includes:
+- **Web service**: Django app on port 8000
+- **Database service**: PostgreSQL 14 on port 5432
+- **Cache service**: Memcached on port 11211
+
+See the Docker setup guide for details on customization and troubleshooting.
+
+## Environment Variables
+
+Key environment variables for production:
+
+- `DJANGO_SETTINGS_MODULE`: Set to `esp.settings`
+- `VIRTUAL_ENV`: Path to virtualenv (if using)
+- `SECRET_KEY`: Unique secret key per site
+
+## Monitoring and Maintenance
+
+### Log Locations
+
+- **Apache errors**: `/var/log/apache2/[sitename]-error.log`
+- **Exim mail logs**: `/var/log/exim4/mainlog`
+- **PostgreSQL**: `/var/log/postgresql/`
+
+### Regular Maintenance
+
+- Monitor disk space in media directories
+- Rotate logs regularly
+- Update system packages monthly
+- Review and archive old program data
+- Test backups quarterly
+
+### Database Backups
+
+```bash
+# Daily backup script
+pg_dump -U espuser sitename_django | gzip > /backups/sitename-$(date +%Y%m%d).sql.gz
+
+# Retain 30 days of backups
+find /backups -name "sitename-*.sql.gz" -mtime +30 -delete
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**500 Internal Server Error**:
+- Check Apache error logs
+- Verify `esp.wsgi` configuration
+- Ensure database is accessible
+- Check file permissions
+
+**Static files not loading**:
+```bash
+cd esp
+python manage.py collectstatic --noinput
+```
+
+**Database connection errors**:
+- Verify PostgreSQL is running
+- Check credentials in `local_settings.py`
+- Ensure database exists
+
+**Email not sending**:
+- Check Exim configuration
+- Verify MX records
+- Test with `python manage.py shell`:
+  ```python
+  from django.core.mail import send_mail
+  send_mail('Test', 'Body', 'from@example.com', ['to@example.com'])
+  ```
+
+## Security Considerations
+
+- Keep `SECRET_KEY` unique per site and never commit to version control
+- Use strong database passwords
+- Enable HTTPS with valid TLS certificates
+- Restrict database access to localhost when possible
+- Regularly update system packages and dependencies
+- Set appropriate file permissions (644 for files, 755 for directories)
+- Review Apache and firewall configurations
+
+## Related Documentation
+
+- [Development Setup](/dev/setup)
+- [Testing Guide](/dev/testing)
+- [Contributing Guide](/dev/contributing)

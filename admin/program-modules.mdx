@@ -1,0 +1,901 @@
+---
+title: Program Modules
+description: Comprehensive guide to all available program modules and their configuration options
+---
+
+Program modules are the building blocks of registration in the ESP Website. Each module provides a specific view or feature that users can access during registration.
+
+## Overview
+
+When you create a program, you select which modules to include. Each module:
+
+- Corresponds to a specific view/page in registration
+- Can be required (must complete) or optional
+- Has a sequence number determining display order
+- May have additional configuration settings
+
+### Selecting Modules
+
+**At program creation**: Choose modules on the newprogram form at `/manage/newprogram`
+
+**After creation**: Edit the "Program modules" field at `/admin/program/program/` (select your program)
+
+**Customize module names**: Change displayed names at `/admin/program/programmodule/`
+
+## Module Categories
+
+Modules are organized by URL pattern:
+
+- **Student**: `/learn/[program]/[instance]/*`
+- **Teacher**: `/teach/[program]/[instance]/*`
+- **Management**: `/manage/[program]/[instance]/*`
+- **Onsite**: `/onsite/[program]/[instance]/*`
+- **Volunteer**: `/volunteer/[program]/[instance]/*`
+
+## Configuring Module Behavior
+
+After associating a module with a program, a **program module object** is created. Edit these at:
+
+```
+/admin/modules/programmoduleobj/
+```
+
+### Common Settings
+
+<Accordion title="Sequence Number (seq)">
+Determines display order. Modules are shown in increasing sequence number order.
+
+Lower numbers appear first in registration.
+</Accordion>
+
+<Accordion title="Required">
+When checked, users must complete this module before accessing the main registration page (if "Force show required modules" is enabled).
+
+Required modules show a checkmark when completed.
+</Accordion>
+
+<Accordion title="Required Label">
+Custom text to clarify requirements beyond "required" or "not required".
+
+Example: "Required for outside teachers" on the teacher biography module.
+</Accordion>
+
+### Additional Configuration
+
+Many modules have extended settings:
+
+- **ClassRegModuleInfo** (teacher class registration): `/admin/modules/classregmoduleinfo/`
+- **StudentClassRegModuleInfo** (student class registration): `/admin/modules/studentclassregmoduleinfo/`
+- **Tags**: `/admin/tagdict/tag/` - Advanced customization (see Tags section)
+
+---
+
+## Student Modules
+
+Modules for student registration workflow:
+
+### StudentRegCore
+
+**Required for student registration**. Provides the main registration page at `/learn/[program]/[instance]/studentreg`.
+
+**Settings** (StudentClassRegModuleInfo):
+
+<Accordion title="Progress Mode">
+- `0`: Don't show registration steps
+- `1`: Show as checkboxes
+- `2`: Show as progress bar
+</Accordion>
+
+<Accordion title="Force Show Required Modules">
+When checked, students must complete all required modules before accessing the main page.
+
+When unchecked, students can complete steps in any order but must finish all required steps before confirming registration.
+</Accordion>
+
+<Accordion title="Confirmation & Buttons">
+- **Confirm button text**: Customize "Confirm registration" button
+- **Cancel button text**: Customize cancel button
+- **View button text**: Customize view button
+- **Cancel button dereg**: If checked, canceling removes student from all classes
+- **Send confirmation**: If checked, email sent on confirmation (requires email receipt setup)
+</Accordion>
+
+**Tags**:
+- `allowed_student_types`: Control which account types can access student registration (default: student and administrator)
+
+### RegProfileModule (Student)
+
+Prompts students to fill out profile information: contact details, parent/emergency contacts, school, grade.
+
+**Automatically duplicates** profile if student filled one out within 5 days (e.g., new account).
+
+**Key Tags**:
+
+<Accordion title="School & Contact Fields">
+- `require_school_field`: Make school required
+- `require_guardian_email`: Require parent email
+- `allow_guardian_no_email`: Add "My parents don't have email" checkbox
+- `request_student_phonenum`: Require student phone number
+</Accordion>
+
+<Accordion title="Grade Level">
+- `allow_change_grade_level`: Let students change grade after first profile (default: locked)
+- `student_grade_options`: JSON list of grade choices (default: 7-12)
+- `show_student_graduation_years_not_grades`: Show graduation years instead of grade numbers
+</Accordion>
+
+<Accordion title="Optional Fields">
+- `student_medical_needs`: Show medical needs text box
+- `show_studentrep_application`: Show student rep application (set to "no_expl" to hide explanation)
+- `show_student_tshirt_size_options`: Ask for T-shirt size
+- `show_student_vegetarianism_options`: Ask about dietary restrictions
+- `ask_student_about_post_hs_plans`: Ask about post-high school plans
+- `ask_student_about_transportation_to_program`: Ask how they're getting to the program
+</Accordion>
+
+### StudentClassRegModule
+
+The core class selection module. Displays catalog, schedule, and registration pages.
+
+**Settings** (StudentClassRegModuleInfo):
+
+<Accordion title="Capacity Controls">
+- **Enforce max**: Unchecked allows students to sign up for full classes
+- **Class cap multiplier**: Apply linear function to capacities (e.g., 0.5 for half-full)
+- **Class cap offset**: Add fixed number to all capacities (e.g., 3 for 3 extra students per class)
+</Accordion>
+
+<Accordion title="Registration Behavior">
+- **Signup verb**: Which registration type to use (default: "Enrolled" for first-come first-served)
+  - Use "Applied" for teacher-selected admission
+  - Create custom types as needed
+- **Use priority**: Allow students to select multiple classes per timeslot, annotated with priority order
+- **Priority limit**: Maximum number of simultaneous classes students can register for (when using priority)
+</Accordion>
+
+<Accordion title="Catalog Display">
+- **Register from catalog**: Show "Register for section X" buttons in catalog (JavaScript-enabled)
+- **Visible enrollments**: Unchecked hides enrollment counts in public catalog
+- **Visible meeting times**: Unchecked hides meeting times in public catalog
+- **Show emailcodes**: Unchecked hides codes like "E464:" before class titles
+- **Show unscheduled classes**: Unchecked hides classes without meeting times
+- **Temporarily full text**: Customize label on disabled "Add class" buttons for full classes
+</Accordion>
+
+**Tags**:
+- `studentschedule_show_empty_blocks`: Show timeslots without classes (default: true)
+
+### StudentClassRegModule Alternatives
+
+<Warning>
+Do not enable these modules simultaneously with StudentClassRegModule.
+</Warning>
+
+<Accordion title="LotteryStudentRegModule">
+Lottery registration where students select classes of interest for later assignment.
+
+Workflow:
+1. Enable only this module during lottery phase
+2. Students choose classes
+3. Run lottery assignment script
+4. Remove this module
+5. Add StudentClassRegModule for first-come first-served
+</Accordion>
+
+<Accordion title="StudentRegTwoPhase">
+New two-phase lottery interface:
+
+**Step 1**: Star interested classes in searchable catalog
+
+**Step 2**: Rank priorities for each timeslot
+
+Configuration:
+- Set `priority_limit` in StudentClassRegModuleInfo
+- Disable after lottery to return to normal registration page
+- Students can then make schedule edits
+
+Provides views:
+- `/learn/<program>/studentreg2phase` - Landing page
+- `/learn/<program>/view_classes` - Filterable catalog (replaces /catalog)
+- `/learn/<program>/mark_classes` - Step 1: Star classes
+- `/learn/<program>/rank_classes` - Step 2: Rank priorities
+</Accordion>
+
+<Accordion title="StudentRegPhaseZero">
+Pre-lottery to limit program size when demand exceeds capacity.
+
+- Based on `program_size_by_grade` tag
+- Students submit non-binding interest
+- Can form groups of up to 4 (all selected or none)
+- Provides templates for lottery winners/losers
+- Keep enabled after lottery to show situational messages
+
+Manage via Phase Zero Management module.
+</Accordion>
+
+### FinancialAidAppModule
+
+**Recommended for all programs**. Students can request financial aid during registration.
+
+- Admins receive email on submission
+- Students with free/reduced lunch auto-approved
+- Review at `/admin/` under "Financial aid requests"
+- Grant aid as percentage or dollar amount
+- Approve in bulk with FinaidApproveModule
+
+### StudentExtraCosts
+
+Optional items for purchase: meals, T-shirts, merchandise.
+
+- "Buy one": Quantity 0 or 1
+- "Buy many": Any quantity
+- Configure via Line Item Management Module
+- Can make items required (forces selection)
+- Custom pricing: Check "Is custom?" for student-entered amount
+- Sibling discount appears here if enabled
+- Counts shown on dashboard
+
+### CustomFormModule (Student)
+
+Add custom forms to registration for data not collected by standard modules.
+
+**Setup**:
+1. Create form at `/customforms/`
+2. Note the form ID from `/customforms/view/[ID]`
+3. Create tag `learn_extraform_id` with form ID as value
+4. (Optional) Associate tag with specific program
+5. View results at `/customforms/`
+
+### StudentAcknowledgementModule
+
+Requires students to agree to conditions (code of conduct, terms, etc.) via form submission.
+
+### StudentLunchSelection
+
+For programs with lunch constraints. Forces students to choose lunch period if they have both morning and afternoon classes.
+
+Reduces confusion about lunch requirements.
+
+### StudentRegConfirm
+
+Adds "Confirm Registration" as a step that requires clicking the Confirm button.
+
+Doesn't provide functionality, just a visual reminder to confirm.
+
+### DonationModule
+
+Solicit donations for Learning Unlimited.
+
+**Default settings**:
+- Text: "Donation to Learning Unlimited"
+- Options: $10, $20, $50
+
+**Override** with `donation_settings` tag (JSON):
+```json
+{
+  "donation_text": "Support our program",
+  "donation_options": [5, 10, 25, 100]
+}
+```
+
+Donation pitch editable inline. Available at `/learn/<program>/<instance>/donation`.
+
+### StudentJunctionAppModule
+
+Global application for the program. Typically used with TeacherReviewApps for class-specific questions.
+
+### FormstackMedLiabModule
+
+Integrate Formstack for sensitive information (medical insurance, liability).
+
+**Setup**:
+1. Create form on Formstack
+2. Create tags: `formstack_id` and `formstack_viewkey` (program-specific)
+3. Configure Formstack to POST to `/learn/[program]/[instance]/medicalpostback581309742`
+
+Controlled by FormstackMedliab deadline.
+
+### SurveyModule (Student)
+
+Online surveys appear at `/learn/[program]/[instance]/survey`.
+
+- Controlled by "Survey" student deadline
+- Create surveys at `/manage/[program]/[instance]/surveys`
+- Default filter: Only students who registered for classes (`classreg`)
+- Override with `survey_student_filter` tag (comma-separated groups)
+
+### StudentOnsite
+
+Mobile-friendly onsite webapp for students.
+
+**Features**:
+- View schedule
+- Make class changes
+- Get directions to classes
+- Fill out surveys
+
+**Setup for maps**:
+1. Get Google Cloud API key
+2. Set `google_cloud_api_key` tag
+3. Set `program_center` tag: `{lat: 37.427490, lng: -122.170267}`
+4. Add "Lat/Long" resource to each classroom with coordinates
+
+**Class changes** use enrollment by default. Advanced:
+- `switch_time_program_attendance` (HH:MM): Use program attendance after this time (min 5 check-ins)
+- `switch_lag_class_attendance` (minutes): Use class attendance after this many minutes into class (min 1 check-in)
+
+Hierarchy: class attendance > program attendance > enrollment
+
+**Tag**: `student_webapp_isstep` = "True" to show in registration checklist
+
+**Views**:
+- `/learn/<program>/studentonsite` - Main webapp & schedule
+- `/learn/<program>/onsitemap` - Google maps with walking directions
+- `/learn/<program>/onsitecatalog` - Class catalog with enrollment
+- `/learn/<program>/onsitesurvey` - Survey interface
+- `/learn/<program>/onsitedetails` - Section details
+
+---
+
+## Teacher Modules
+
+Modules for teacher registration workflow:
+
+### TeacherRegCore
+
+**Required for teacher registration**. Displays main teacher registration page with summary of other modules.
+
+### RegProfileModule (Teacher)
+
+Prompts teachers for profile information: contact, affiliation, graduation year.
+
+**Hide fields** with tag:
+- `teacherreg_hide_fields`: Comma-separated list (e.g., "purchase_requests")
+
+**Customize labels** with tags:
+- `teacherreg_label_purchase_requests`: Override "Planned Purchases" label
+- `teacherreg_help_text_purchase_requests`: Override help text
+- `teacherreg_label_message_for_directors`: Override "Message for Directors" label
+- `teacherreg_help_text_message_for_directors`: Override help text
+
+**Shirt options**:
+- `teacherinfo_shirt_options` = "False": Hide shirt size/type
+- `teacherinfo_shirt_type_selection` = "False": Hide fitted vs straight cut choice
+
+### TeacherClassRegModule
+
+Core module for teachers to register and view classes. Upload files, create web pages, import from previous programs.
+
+**Requires timeslots** to be set up (establishes possible class lengths).
+
+**Tags**:
+
+<Accordion title="Difficulty Field">
+- `teacherreg_difficulty_label`: Change "Difficulty" field name
+- `teacherreg_difficulty_choices`: JSON list of choices
+  ```json
+  [[1, "Easy"], [2, "Medium"], [3, "Hard"]]
+  ```
+  Left value appears in catalog, right value shown to teachers.
+</Accordion>
+
+- `allow_class_import`: Enable importing classes from previous programs
+
+### AvailabilityModule
+
+Teachers indicate availability for each timeslot.
+
+<Warning>
+Teachers cannot change availability after classes are scheduled. Scheduling module enforces availability constraints.
+</Warning>
+
+**Override** with "Force Availability" feature in scheduler or schedule via "Manage Class" page.
+
+### TeacherBioModule
+
+Brief biography and optional photo upload. Linked from student catalog.
+
+**URL**: `/teach/teachers/[username]/bio.html`
+
+<Warning>
+All information is public and may be cached. Teachers should not enter private information.
+</Warning>
+
+### TeacherEventsModule
+
+Teachers sign up for training and/or interview time slots.
+
+Only include if you want all teachers to register for these events. Configure event slots on management side with TeacherEventsModule management.
+
+### TeacherPreviewModule
+
+Teachers can:
+- See summary of other teachers' classes (including unreviewed/rejected)
+- Preview their own class in catalog format: `/teach/[program]/[instance]/catalogpreview/[class ID]`
+
+### TeacherQuizModule
+
+Show quiz during registration to ensure teachers have logistical knowledge.
+
+**All questions must be answered correctly** to proceed.
+
+**Setup**:
+1. Create custom form at `/customforms/` with correct answers
+2. Note form ID
+3. Create tag `quiz_form_id` with form ID
+4. (Optional) Associate with specific program
+
+### TeacherAcknowledgementModule
+
+Requires teachers to confirm they will attend. Checkbox form to convey seriousness and reduce no-shows.
+
+### TeacherReviewApps
+
+Teachers create application questions for their classes (optional for teachers, required for students once created).
+
+<Warning>
+Only include if you will review responses for admission. Otherwise confusing and unnecessary.
+</Warning>
+
+### TeacherAdmissionsDashboard
+
+Interface for teachers to review applications for their classes.
+
+See [Student Applications](./student-apps) for details.
+
+### SurveyModule (Teacher)
+
+Online surveys at `/teach/[program]/[instance]/survey`.
+
+- Controlled by "Survey" teacher deadline
+- Create at `/manage/[program]/[instance]/surveys`
+- Default filter: Teachers who submitted a class (`class_submitted`)
+- Override with `survey_teacher_filter` tag
+
+### TeacherOnsite
+
+Mobile-friendly onsite webapp for teachers.
+
+**Features**:
+- View schedule
+- Take attendance
+- Get directions
+- Fill out surveys
+- View student survey results
+
+**Setup**: Same as StudentOnsite (Google Maps API, program center, classroom coordinates)
+
+**Tag**: `teacher_webapp_isstep` = "True" to show in registration checklist
+
+**Views**:
+- `/teach/<program>/teacheronsite` - Main webapp & schedule
+- `/teach/<program>/onsitemap` - Google maps with directions
+- `/teach/<program>/onsitesurvey` - Surveys & student results
+- `/teach/<program>/onsitedetails` - Section details
+- `/teach/<program>/onsiteroster` - Roster & attendance
+
+### TeacherModeratorModule
+
+Teachers indicate interest in moderating (or observing, TA-ing, etc.).
+
+**Customize term** with tag: `Moderator title`
+
+Admins assign moderators via scheduler. Moderators can:
+- View section assignments
+- Take attendance for assigned sections
+
+Moderator info appears throughout site: dashboard, big board, printables.
+
+---
+
+## Management Modules
+
+Admin tools for program management:
+
+### AdminCore
+
+**Required for all programs**. Provides:
+- Program dashboard
+- Deadline management
+- Registration type management
+- Lunch constraints control
+
+### AdminClass
+
+**Recommended for all programs**. Frequently used class management:
+
+- "Manage class" page (scheduling, co-teachers, open/close sections, cancel with email)
+- Class review/approval (via email links)
+- Bulk approval by class IDs
+
+Access from dashboard class lists.
+
+### JSONDataModule
+
+**Required for all programs**. Provides data for dashboard statistics, Ajax scheduling, and other modules.
+
+### AdminVitals
+
+Displays program statistics on dashboard.
+
+### CommModule
+
+Email communication with participants.
+
+**Features**:
+- Select recipients (basic or combination lists)
+- Recipient checklist to preview
+- Rich text editor (bold, lists, tables, colors, images)
+- Template tags dropdown for dynamic content
+- HTML email support
+
+<Note>
+Combination lists often don't contain expected users due to technical limitations. Verify recipient count looks reasonable before sending.
+</Note>
+
+### ResourceModule
+
+**Essential for most programs**. Manage:
+
+1. **Timeslots**: Required for teacher registration. Set up immediately. Can import from previous program. Don't delete after creation.
+2. **Classrooms**: Needed for scheduling
+3. **Resource types**: Options for teachers on class creation (projector, whiteboard, etc.)
+4. **Floating resources**: Equipment assigned to individual classes
+
+Edit resource types at `/admin/resources/resourcetype`.
+
+### AJAXSchedulingModule
+
+Main scheduling interface at `/manage/[program]/[instance]/ajax_scheduling`.
+
+**Features**:
+- Grid-based drag-and-drop
+- Multi-user support with periodic updates
+- Conflict warnings
+- Teacher availability enforcement
+- Class search and filters
+- Comments and class locking
+
+**Legend**:
+- Green: Can place class
+- Green with stripes: Multi-hour class (place at leftmost green square)
+- Yellow: Teacher available but teaching another class
+
+**Instructions**:
+1. Click class to select (directory or grid)
+2. Click green square to place
+3. Hover for tooltips
+4. Use directory search/filters
+5. Set comments/locks via upper right pane
+
+**Keyboard shortcuts**:
+- ESC: Unselect class
+- F1: Directory tab
+- F2: Filters tab
+- /: Search box
+- DEL: Unschedule selected class
+
+**Limitations**: Incomplete support for overlapping timeslots and non-1-hour slots.
+
+### SchedulingCheckModule
+
+Validate schedule after scheduling.
+
+**Detects**:
+- Teacher conflicts
+- Travel time issues
+- Missing resources
+- Capacity mismatches
+
+For large programs, view individual checks:
+```
+[site].learningu.org/manage/[program]/[instance]/scheduling_check_list
+```
+
+### ClassFlagModule
+
+Track class review with custom flags ("needs safety review", "description proofread", etc.).
+
+**Setup**:
+1. Add flag types at `/admin/program/classflagtype/`
+2. Add to program at `/admin/program/program/`
+3. Add/view flags from edit/manage class pages
+
+### ClassSearchModule
+
+Build queries for classes by flag, status, category, etc.
+
+Access via "Search for Classes" on management main page.
+
+### AdminMorph
+
+View site as any user (except administrators).
+
+1. Access `admin_morph` view
+2. Search for user
+3. Morph to see their perspective
+4. Click "Unmorph" when done
+
+<Warning>
+Always unmorph before admin tasks. Back button doesn't work - causes permission errors.
+</Warning>
+
+### ListGenModule
+
+Generate user lists with custom fields.
+
+- Filter like communications panel
+- Select fields (school, grade, emergency contact, etc.)
+- Export to HTML (print) or CSV (spreadsheet)
+
+### ProgramPrintables
+
+Generate printables:
+- PDF class catalog
+- Student schedules (individual/batch)
+- Room schedules
+- Teacher schedules
+- Rosters
+
+Customize student schedules: Override `program/modules/programprintables/studentschedule.tex`.
+
+Test with small subset before batch generation (can take several minutes).
+
+### NameTagModule
+
+Generate nametags for students, teachers, administrators.
+
+- Students/teachers: Use filtering options
+- Administrators: Manual entry (names and titles)
+
+Follow printing instructions (no margin, 100% scaling). Output ordering is intentional for alphabetical concatenation.
+
+Customize: Override `program/modules/nametagmodule/singleid.html`.
+
+### AdminMaterials
+
+View and upload documents for classes.
+
+- See all teacher-uploaded files
+- Upload admin files (per-class or program-wide)
+- Low-level management: `/admin/filebrowser/browse`
+
+### SurveyManagement
+
+Create and manage surveys.
+
+**Create** at `/manage/[program]/[instance]/surveys/manage`
+
+**Types**:
+- Program-wide questions
+- Class-specific questions
+
+**View/export** results via this module.
+
+### AdminReviewApps
+
+Admin review of student applications.
+
+- Select students for admission
+- View applications and teacher reviews
+- Typically teachers do most review work
+
+May be augmented/replaced with custom forms or Formstack.
+
+### CreditCardViewer
+
+View payment information:
+- Student invoices
+- Amounts owed and paid
+- Payment history
+
+Works with Cybersource, Stripe, or manual entry.
+
+### FinaidApproveModule
+
+Bulk financial aid approval interface.
+
+### CreditCardModule (Stripe)
+
+Accept credit card payments via Stripe.
+
+**Setup**: Contact websupport@learningu.org at least 1 month before registration.
+
+**Configuration**:
+- STRIPE_CONFIG settings (live and test keys)
+- Enable module
+- Open "Pay for a program" deadline
+
+**Settings** override with `stripe_settings` tag (JSON):
+```json
+{
+  "donation_text": "Donation to Learning Unlimited",
+  "donation_options": [10, 20, 50],
+  "offer_donation": true
+}
+```
+
+Students confirm charges, enter card info (sent directly to Stripe), optionally donate to LU.
+
+### CreditCardModule (Cybersource)
+
+Accept payments via Cybersource hosted order page. MIT only.
+
+### GroupTextModule
+
+Send text messages via Twilio (contact websupport for setup).
+
+- Select users like communications panel
+- Respects texting preferences
+- Can override for emergencies
+
+Useful for:
+- Last-minute lunch changes
+- Class cancellations
+- Urgent announcements
+
+### TeacherEventsModule (Management)
+
+Define time slots for teacher training and interviews.
+
+### VolunteerManage
+
+Define time slots for volunteers and view signups.
+
+### StudentBigBoardModule
+
+Real-time student registration statistics.
+
+Access: "Student Registration Big Board" on management page or `/manage/[program]/[instance]/bigboard`
+
+**Shows**:
+- Current registration count
+- Classes per timeslot  
+- Priority assignments
+- Fast-loading alternative to dashboard
+
+Especially useful during lottery registration.
+
+### TeacherBigBoardModule
+
+Real-time teacher registration statistics.
+
+**Shows**:
+- Registered/approved classes
+- Teacher count
+- Class-hours
+- Class-student-hours
+- Recent registrations (last 10 min)
+- Current day check-ins
+
+### StudentRegPhaseZeroManage
+
+Manage Phase Zero lottery:
+- Track lottery registration
+- Run lottery
+- Winners get `OverridePhaseZero` and `Student/All` permissions
+
+### LotteryFrontendModule
+
+Run class registration lottery without web-team.
+
+<Steps>
+  <Step title="Enable Module">
+    Add to program
+  </Step>
+  <Step title="Generate Schedules">
+    Click "Generate Student Schedules"
+  </Step>
+  <Step title="Review Statistics">
+    Check results
+  </Step>
+  <Step title="Save to Website">
+    Click "Save Schedules to Website"
+  </Step>
+</Steps>
+
+<Warning>
+"Save Schedules" clobbers existing student registrations. Use with care.
+</Warning>
+
+---
+
+## Onsite Modules
+
+Modules for day-of-program operations:
+
+### OnsiteCore
+
+**Required if using any onsite modules**. Shows main onsite page linking to other modules.
+
+Accessible to admins and special "onsite" user (set password at `/admin/users/espuser/`).
+
+### OnSiteCheckinModule
+
+Record student attendance with two options:
+
+1. **Rapid check-in** (`rapidcheckin`): Autocomplete name search, submit one at a time
+2. **Barcode check-in** (`barcodecheckin`): Scan IDs from nametags/schedules, batch submission
+
+Can type manually if no scanners available.
+
+### OnSiteClassList
+
+Scrolling list of open classes for projection or student viewing.
+
+**Includes class changes grid** (`classchange_grid`): Preferred method for schedule changes.
+
+- Compact display of all classes
+- Color codes for capacity (predicted and actual)
+- Find student to highlight selections
+- Check boxes to modify registration
+
+May have performance issues on slow laptops with large programs.
+
+### OnsiteClassSchedule
+
+Morph into student to use regular registration pages for class changes.
+
+More flexible but slower than class changes grid. Can request schedule printing (if OnsitePrintSchedules enabled).
+
+### OnsitePaidItemsModule
+
+Search for user and view purchased items (meals, T-shirts).
+
+Only needed if StudentExtraCosts module was used.
+
+### OnsitePrintSchedules
+
+Unattended automated schedule printing.
+
+**Setup**:
+1. Enable module
+2. Run `poll_schedules.sh` on printer computer (modify for OS/program)
+3. Specify printers at `/admin/utils/printer/`
+
+Volunteers queue schedules from grid or registration; shared printer prints automatically.
+
+### OnSiteRegister
+
+Create accounts for walk-in students who haven't registered online.
+
+Assign to classes using OnsiteClassSchedule or class change grid.
+
+---
+
+## Volunteer Modules
+
+### VolunteerSignup
+
+Volunteer registration form at `/volunteer/[program]/[instance]/signup`.
+
+- Select available timeslots
+- Provide contact information
+- Creates account if not logged in
+
+Requires timeslots set up via VolunteerManage (distinct from class timeslots).
+
+---
+
+## Advanced Configuration: Tags
+
+Tags provide fine-grained control over module behavior. Create at `/admin/tagdict/tag/`.
+
+**Structure**:
+- **Key**: Setting name (e.g., `require_school_field`)
+- **Value**: Setting value
+- **Content type**: Program (for program-specific) or blank (global)
+- **Object ID**: Program ID (from `/admin/program/program/`)
+
+See individual module descriptions above for available tags.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Programs" href="./creating-programs">
+    Set up a new program with the right modules
+  </Card>
+  <Card title="Student Applications" href="./student-apps">
+    Configure application-based admission
+  </Card>
+</CardGroup>

@@ -1,0 +1,413 @@
+---
+title: Directory structure
+description: Guide to the ESP Website codebase organization
+---
+
+This guide provides an overview of the ESP Website repository structure to help you find what you need.
+
+## Repository Root
+
+```
+ESP-Website/
+├── docs/              # Documentation (RST format)
+├── esp/               # Django project root
+├── deploy/            # Deployment scripts and configs
+├── Dockerfile         # Docker container definition
+├── docker-compose.yml # Docker orchestration
+├── esp.wsgi           # WSGI entry point for production
+├── README.md          # Project overview
+└── LICENSE            # AGPL v3 license
+```
+
+## Documentation (`/docs`)
+
+<Accordion title="Documentation Structure">
+  ```
+  docs/
+  ├── admin/           # Administrator documentation
+  │   ├── program_modules.rst
+  │   ├── themes.rst
+  │   ├── student_apps.rst
+  │   └── releases/    # Release notes
+  └── dev/             # Developer documentation
+      ├── docker.rst
+      ├── contributing.rst
+      ├── directory_structure.rst
+      ├── cache.rst
+      ├── email.rst
+      └── tags.rst
+  ```
+  
+  **Purpose**: Original documentation in ReStructuredText format. Being migrated to this Mintlify site.
+</Accordion>
+
+## ESP Django Project (`/esp`)
+
+This is the heart of the application.
+
+### Root Level (`/esp`)
+
+```
+esp/
+├── esp/               # Python package root
+├── manage.py          # Django management command
+├── public/            # Static files served to users
+├── templates/         # Django templates
+├── useful_scripts/    # Utility scripts
+├── requirements.txt   # Python dependencies
+└── packages_*.txt     # System package dependencies
+```
+
+**Key Files**:
+
+<ParamField path="manage.py" type="file">
+  Main Django management script. Run `./manage.py <command>` for:
+  - `runserver` - Start development server
+  - `shell_plus` - Enhanced Python shell
+  - `migrate` - Apply database migrations
+  - `test` - Run test suite
+  - `createsuperuser` - Create admin account
+</ParamField>
+
+<ParamField path="requirements.txt" type="file">
+  Python dependencies including:
+  - Django 2.2.28
+  - PostgreSQL adapter (psycopg2)
+  - Memcached client (pylibmc)
+  - Payment processors (Stripe)
+  - Communication (Twilio, SendGrid)
+</ParamField>
+
+### Python Package (`/esp/esp`)
+
+Every directory from here requires an `__init__.py` file.
+
+```
+esp/esp/
+├── __init__.py
+├── settings.py        # Django settings (loads local_settings.py)
+├── urls.py            # Master URL routing
+├── django_settings.py # Shared Django configuration
+├── local_settings.py  # Site-specific settings (gitignored)
+├── accounting/        # Payment and accounting
+├── cal/               # Calendar and events
+├── customforms/       # Custom form builder
+├── dbmail/            # Email queue system
+├── program/           # Core program logic ⭐
+├── qsd/               # Admin-editable content
+├── resources/         # Classrooms and equipment
+├── tagdict/           # Tag configuration system
+├── themes/            # Theme customization
+├── users/             # User models and auth ⭐
+└── utils/             # Utility functions
+```
+
+**Most Important Apps**:
+
+## Program App (`/esp/esp/program`) ⭐
+
+Contains most of the site's logic.
+
+```
+program/
+├── models/            # Data models
+│   ├── __init__.py    # Program model
+│   ├── app_.py        # RegistrationProfile, StudentSubjectInterest
+│   ├── class_.py      # ClassSubject, ClassSection
+│   └── flags.py       # ClassFlag system
+├── modules/           # Program module system ⭐
+│   ├── base.py        # Base module classes
+│   ├── module_ext.py  # Module registration
+│   ├── handlers/      # Individual module implementations
+│   │   ├── studentregcore.py
+│   │   ├── teacherregcore.py
+│   │   ├── admincore.py
+│   │   └── ... (70+ modules)
+│   ├── forms/         # Module-specific forms
+│   └── templates/     # Module-specific templates
+├── controllers/       # Backend logic
+│   ├── autoscheduler/ # Automatic class scheduling
+│   └── ...            # Other controllers
+├── migrations/        # Database migrations
+├── tests/             # Test suite
+├── admin.py           # Django admin customization
+└── urls.py            # Program URL routing
+```
+
+<Info>
+  **Program Modules** are the core extensibility mechanism. Each module (like `StudentRegCore` or `TeacherBioModule`) handles a specific workflow. Modules are stored in `handlers/<name>module.py`.
+  
+  See the [Program Modules documentation](/dev/program-modules) for details.
+</Info>
+
+### Program Module Handlers
+
+The `handlers/` directory contains 70+ module files:
+
+<AccordionGroup>
+  <Accordion title="Student Modules (learn)">
+    - `studentregcore.py` - Main student registration page
+    - `studentclassregmodule.py` - Class selection interface
+    - `studentregtwophase.py` - Two-phase lottery registration
+    - `lotterystudentregmodule.py` - Priority lottery
+    - `financialaidappmodule.py` - Financial aid applications
+    - `studentonsite.py` - Onsite student features
+    - And 15+ more...
+  </Accordion>
+  
+  <Accordion title="Teacher Modules (teach)">
+    - `teacherregcore.py` - Main teacher registration page
+    - `teacherclassregmodule.py` - Class creation/editing
+    - `teacherbiomodule.py` - Teacher biography submission
+    - `availabilitymodule.py` - Teacher availability
+    - `teacheronsite.py` - Onsite teacher features
+    - And 10+ more...
+  </Accordion>
+  
+  <Accordion title="Admin Modules (manage)">
+    - `admincore.py` - Admin dashboard and settings
+    - `adminclass.py` - Class review and approval
+    - `ajaxschedulingmodule.py` - Manual scheduling interface
+    - `autoschedulerfrontendmodule.py` - Automatic scheduler
+    - `commmodule.py` - Email communications
+    - `listgenmodule.py` - User list generation
+    - And 30+ more...
+  </Accordion>
+  
+  <Accordion title="Onsite Modules (onsite)">
+    - `onsitecore.py` - Onsite landing page
+    - `onsitecheckinmodule.py` - Student check-in
+    - `onsiteregister.py` - Walk-in registration
+    - `teachercheckinmodule.py` - Teacher check-in
+    - And 10+ more...
+  </Accordion>
+</AccordionGroup>
+
+## Users App (`/esp/esp/users`) ⭐
+
+```
+users/
+├── models/            # User models
+│   ├── __init__.py    # ESPUser, Permission, Record, ContactInfo
+│   └── userbits/      # Additional user data
+├── controllers/       # User management logic
+├── forms/             # User forms
+├── views/             # User views (login, profile, etc.)
+├── migrations/        # Database migrations
+└── tests.py           # User tests
+```
+
+**Key Models**:
+- `ESPUser` - Proxy model extending Django's User with methods for students/teachers
+- `Permission` - Fine-grained access control
+- `Record` - Tracks user completion of requirements
+- `ContactInfo` - Phone numbers and addresses
+- `StudentInfo` - Student-specific data (grade, school)
+- `TeacherInfo` - Teacher-specific data (MIT affiliation, etc.)
+
+See the [User Model documentation](/api/models/user) for details.
+
+## Other Important Apps
+
+<AccordionGroup>
+  <Accordion title="Accounting (/esp/esp/accounting)">
+    Payment processing and financial tracking.
+    
+    **Key Models**:
+    - `LineItemType` - Types of charges (program fee, lunch, etc.)
+    - `Transfer` - Payment records
+    - `FinancialAidRequest` - Financial aid applications
+    - `FinancialAidGrant` - Aid approvals
+    
+    **Features**:
+    - Stripe and CyberSource payment integration
+    - Accounting reports
+    - Financial aid workflow
+  </Accordion>
+  
+  <Accordion title="Resources (/esp/esp/resources)">
+    Classroom and equipment management.
+    
+    **Key Models**:
+    - `ResourceType` - Categories (classroom, projector, etc.)
+    - `Resource` - Individual resources with capacity
+    - `ResourceRequest` - Classes requesting resources
+    - `ResourceAssignment` - Assigned resources
+    
+    <Note>The resources system is being redesigned. Current implementation can be complex.</Note>
+  </Accordion>
+  
+  <Accordion title="Calendar (/esp/esp/cal)">
+    Time blocks and event scheduling.
+    
+    **Key Models**:
+    - `Event` - Time blocks for class sections
+    - `EventType` - Categories (Class Time, Lunch, etc.)
+    
+    **Usage**: Programs define time slots as Events, then sections are scheduled into them.
+  </Accordion>
+  
+  <Accordion title="QSD (/esp/esp/qsd)">
+    Quasi-Static Data - admin-editable page content.
+    
+    **Key Models**:
+    - `QuasiStaticData` - Content blocks with versioning
+    
+    **Usage**:
+    ```django
+    {% load render_qsd %}
+    {% render_inline_qsd "welcome_message" %}
+    ```
+    
+    Administrators can edit this content at `/admin/qsd/quasistaticdata/`.
+  </Accordion>
+  
+  <Accordion title="Tagdict (/esp/esp/tagdict)">
+    Flexible key-value configuration system.
+    
+    **Key Models**:
+    - `Tag` - Configuration values scoped to programs or global
+    
+    See the [Tags documentation](/dev/tags) for details.
+  </Accordion>
+  
+  <Accordion title="Dbmail (/esp/esp/dbmail)">
+    Email queue and delivery system.
+    
+    **Key Models**:
+    - `MessageRequest` - Email send requests
+    - `TextOfEmail` - Email content
+    - `EmailList` - Mailing list routing
+    
+    See the [Email documentation](/dev/email) for details.
+  </Accordion>
+  
+  <Accordion title="Customforms (/esp/esp/customforms)">
+    Form builder for custom data collection.
+    
+    **Usage**: Create forms at `/customforms/`, embed in registration via tags.
+  </Accordion>
+  
+  <Accordion title="Themes (/esp/esp/themes)">
+    Site theming and branding system.
+    
+    **Features**:
+    - Theme selection (barebones, circles, fruitsalad, etc.)
+    - Color customization
+    - Logo and image management
+    - Template override generation
+  </Accordion>
+</AccordionGroup>
+
+## Static Files (`/esp/public`)
+
+```
+public/
+└── media/             # Served at /media/
+    ├── scripts/       # JavaScript
+    ├── styles/        # CSS and LESS
+    ├── images/        # Images (symlink to uploaded content)
+    └── theme_editor/  # Theme customization UI
+```
+
+**Static File Serving**:
+- Development: Django's `runserver` serves from `public/media/`
+- Production: Apache serves directly from filesystem
+- File path `/esp/public/media/scripts/foo.js` → URL `/media/scripts/foo.js`
+
+## Templates (`/esp/templates`)
+
+```
+templates/
+├── main.html          # Base template
+├── elements/          # Reusable components
+├── program/           # Program templates
+│   ├── base.html      # Program base template
+│   └── modules/       # Module-specific templates
+├── users/             # User account templates
+├── qsd/               # QSD templates
+└── registration/      # Django auth templates
+```
+
+**Template Hierarchy**:
+```
+main.html
+  ↓ extends
+program/base.html
+  ↓ extends
+program/modules/studentregcore/student_reg.html
+```
+
+## Deployment (`/deploy`)
+
+```
+deploy/
+├── ci/                # CI/CD scripts
+│   ├── tests.sh       # Test runner
+│   └── lint.sh        # Linter
+├── new_site.sh        # Site setup script
+└── ... (other deployment utilities)
+```
+
+See the [Deploying documentation](/dev/deploying) for production setup.
+
+## Useful Scripts (`/esp/useful_scripts`)
+
+```
+useful_scripts/
+├── surveygen.py       # Survey generation
+├── dumpdata.py        # Database export
+└── ... (various utility scripts)
+```
+
+<Warning>
+  Scripts in this directory may be site-specific, outdated, or experimental. Review code before running.
+</Warning>
+
+## Finding What You Need
+
+<Steps>
+  <Step title="Looking for a model?">
+    Check `esp/esp/{app}/models.py` or `models/__init__.py`
+    
+    Example: `Program` is in `esp/esp/program/models/__init__.py`
+  </Step>
+  
+  <Step title="Looking for a view?">
+    Check `esp/esp/{app}/views.py` or for program modules, `esp/esp/program/modules/handlers/{module}module.py`
+    
+    Example: Student registration is in `esp/esp/program/modules/handlers/studentregcore.py`
+  </Step>
+  
+  <Step title="Looking for a template?">
+    Check `esp/templates/{app}/` or `esp/templates/program/modules/{module}/`
+    
+    Example: Student reg template is in `esp/templates/program/modules/studentregcore/`
+  </Step>
+  
+  <Step title="Looking for a URL route?">
+    Start at `esp/esp/urls.py`, then check app-specific `urls.py` files
+    
+    Program module URLs are dynamically generated based on module type.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/dev/architecture">
+    Understand the system design
+  </Card>
+  
+  <Card title="Models Reference" icon="database" href="/dev/models">
+    Learn about data models
+  </Card>
+  
+  <Card title="Program Modules" icon="puzzle-piece" href="/dev/program-modules">
+    Explore the module system
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/dev/contributing">
+    Start contributing code
+  </Card>
+</CardGroup>

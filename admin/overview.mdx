@@ -1,0 +1,271 @@
+---
+title: Administrator Overview
+description: Introduction to managing and administering programs in the ESP Website platform
+---
+
+The ESP Website platform provides comprehensive tools for administrators to manage educational programs like Splash. As an admin, you'll be able to create programs, configure modules, manage registrations, and oversee all aspects of your program.
+
+## Admin Dashboard
+
+The program dashboard is your central hub for managing a program. Access it at:
+
+```
+https://[yoursite].learningu.org/manage/[program]/[instance]
+```
+
+The dashboard provides:
+
+- **Program Statistics**: Real-time counts of registered students, teachers, and classes
+- **Module Access**: Links to all enabled program modules
+- **Deadline Management**: Control when registration opens and closes
+- **Quick Actions**: Access to common administrative tasks
+
+<Note>
+You must enable the **AdminCore** module for every program. It provides the dashboard and essential management features.
+</Note>
+
+## Key Administrative Areas
+
+### Program Management
+
+<Accordion title="Dashboard & Statistics">
+The AdminVitals module displays key metrics about your program including student and teacher registrations, class counts, and enrollment statistics. This information updates in real-time as users register.
+</Accordion>
+
+<Accordion title="Deadline Management">
+Control access to different parts of registration by setting deadlines. Each deadline has:
+- **Opening date/time**: When the feature becomes available
+- **Closing date/time**: When the feature is no longer accessible
+- **Role**: Which user type (Student, Teacher, Volunteer) the deadline applies to
+
+Common deadline types include:
+- Student/Classes
+- Teacher/Classes  
+- Student/MainPage
+- Teacher/MainPage
+</Accordion>
+
+<Accordion title="Registration Types">
+Define how students sign up for classes:
+- **Enrolled**: Standard first-come, first-served registration
+- **Applied**: Students apply; teachers select which to admit
+- **Priority**: Students rank multiple choices per timeslot
+- Custom types for specific needs
+</Accordion>
+
+### Class Management
+
+<Steps>
+  <Step title="Review Classes">
+    Approve or reject classes submitted by teachers. The AdminClass module provides:
+    - Individual class review with email notifications
+    - Bulk approval by entering class IDs
+    - Direct links from class creation emails
+  </Step>
+  
+  <Step title="Schedule Classes">
+    Use the Ajax Scheduling Module to assign times and rooms to classes. The grid interface shows:
+    - Available timeslots and classrooms
+    - Teacher availability constraints
+    - Real-time conflict detection
+    - Multi-user scheduling support
+  </Step>
+  
+  <Step title="Manage Resources">
+    Configure classrooms, timeslots, and equipment through the Resource Module:
+    - Define program timeslots (required for teacher registration)
+    - Add classrooms with capacities
+    - Create floating resources (projectors, equipment)
+    - Set up resource types for teacher requests
+  </Step>
+</Steps>
+
+### Communications
+
+<Accordion title="Email Participants">
+The CommModule allows sending emails to program participants with flexible recipient selection:
+
+- Basic lists: Single criteria (e.g., all enrolled students)
+- Combination lists: Multiple criteria with Boolean logic
+- Recipient checklist: Preview who will receive the email
+- Rich text editor: Format messages with styles, tables, images
+- Template tags: Insert dynamic content (names, schedules, etc.)
+</Accordion>
+
+<Accordion title="Group Text Messages">
+With Twilio integration, send urgent text messages to:
+- All enrolled students
+- Students in specific classes
+- Teachers
+- Volunteers
+
+Respects user texting preferences with optional override for emergencies.
+</Accordion>
+
+## User Management
+
+### Morphing
+
+The AdminMorph module lets you view the site as any user:
+
+1. Access the admin_morph view
+2. Search for a user by name
+3. Click to morph into their account
+4. See exactly what they see during registration
+5. Click "Unmorph" when finished
+
+<Warning>
+You cannot morph into administrator accounts for security reasons. Always click "Unmorph" before performing admin tasks - using the back button will cause permission errors.
+</Warning>
+
+### User Lists & Data
+
+The ListGenModule creates custom user lists:
+
+- Filter users like the communications panel
+- Select which fields to include (school, grade, emergency contact, etc.)
+- Export to HTML (printing) or CSV (spreadsheets)
+- Perfect for creating rosters, contact lists, or demographic reports
+
+## Financial Management
+
+### Payment Processing
+
+Support for multiple payment methods:
+
+<Accordion title="Credit Cards (Stripe)">
+The Stripe Credit Card Module provides:
+- Secure payment collection (card data goes directly to Stripe)
+- Configurable donation options for Learning Unlimited
+- Test mode for development
+- Automatic invoice reconciliation
+
+Requires configuration of STRIPE_CONFIG settings and opening the "Pay for a program" deadline.
+</Accordion>
+
+<Accordion title="Financial Aid">
+Review and approve financial aid requests:
+
+1. Students submit requests via FinancialAidAppModule
+2. Students with free/reduced lunch are auto-approved
+3. Admins review applications at /admin/ under "Financial aid requests"
+4. Grant aid as percentage or dollar amount
+5. Typically 100% grants ensure students don't pay regardless of choices
+
+The FinaidApproveModule provides bulk approval interface.
+</Accordion>
+
+### Accounting
+
+The Credit Card Viewer module displays:
+- Student invoices for the program
+- Amounts owed and paid
+- Payment history and transaction IDs
+- Works with Stripe, Cybersource, or manual entry
+
+## Onsite Operations
+
+During the program, onsite modules help manage day-of operations:
+
+### Check-in
+
+The OnSiteCheckinModule provides two methods:
+
+1. **Rapid Check-in**: Autocomplete search by name
+2. **Barcode Check-in**: Scan student IDs from nametags/schedules
+
+### Class Changes
+
+Handle student schedule changes with:
+
+- **Class Change Grid**: Compact view of all classes with enrollment status, color-coded by capacity
+- **Onsite Scheduling**: Full registration interface with morphing
+- **Student Webapp**: Mobile-friendly self-service class changes
+
+### Printables & Materials
+
+The ProgramPrintables module generates:
+
+- PDF class catalog
+- Student schedules (individual or batch)
+- Room schedules for volunteers
+- Attendance rosters
+- Teacher information sheets
+
+The AdminMaterials module manages uploaded files and documents for classes.
+
+## Reports & Analytics
+
+### Scheduling Checks
+
+After scheduling, run the SchedulingCheckModule to detect:
+
+- Teacher conflicts (teaching two classes simultaneously)
+- Travel time issues (back-to-back classes in distant rooms)
+- Missing resources (class needs projector but none assigned)
+- Room capacity mismatches
+
+For large programs, view checks individually at:
+```
+[site].learningu.org/manage/[program]/[instance]/scheduling_check_list
+```
+
+### Survey Management
+
+Create and analyze surveys for students and teachers:
+
+- Program-wide questions
+- Class-specific questions  
+- Export results to CSV
+- View response statistics
+
+Manage surveys at `/manage/[program]/[instance]/surveys/manage`.
+
+## Big Board Views
+
+Monitor registration in real-time:
+
+### Student Registration Big Board
+
+- Current registration count
+- Classes per timeslot
+- Priority assignments (for lottery)
+- Fast-loading alternative to dashboard
+- Particularly useful during lottery registration
+
+### Teacher Registration Big Board
+
+- Number of registered/approved classes
+- Teacher count
+- Class-hours and class-student-hours
+- Recently registered classes (last 10 minutes)
+- Current day check-ins
+
+## Getting Help
+
+When managing your program:
+
+<Note>
+**Contact web support** at websupport@learningu.org for:
+- Payment processing setup (at least 1 month before registration)
+- Twilio configuration for text messages
+- Theme customization questions
+- Technical issues or bugs
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create a Program" href="./creating-programs">
+    Learn how to set up a new program with the right configuration
+  </Card>
+  <Card title="Configure Modules" href="./program-modules">
+    Choose and customize program modules for registration
+  </Card>
+  <Card title="Customize Theme" href="./themes">
+    Set up your site's appearance and navigation
+  </Card>
+  <Card title="Student Applications" href="./student-apps">
+    Set up application-based admission for classes
+  </Card>
+</CardGroup>

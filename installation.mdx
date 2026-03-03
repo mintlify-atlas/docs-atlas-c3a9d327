@@ -1,0 +1,631 @@
+---
+title: "Installation Guide"
+description: "Set up a local ESP Website development environment using Docker"
+---
+
+## Overview
+
+This guide will help you set up a local development environment for ESP Website. We'll use Docker to ensure a consistent setup that works on all platforms without requiring manual installation of Python, PostgreSQL, or other dependencies.
+
+<Note>
+  **Docker-based setup is recommended** for all developers. It requires only Docker and Docker Compose to be installed on your machine.
+</Note>
+
+## Prerequisites
+
+<Tabs>
+  <Tab title="Windows">
+    Install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/).
+    
+    **Requirements:**
+    - Windows 10 64-bit: Pro, Enterprise, or Education (Build 19041 or higher)
+    - WSL 2 feature enabled
+    - At least 4GB of RAM
+  </Tab>
+  
+  <Tab title="macOS">
+    Install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/).
+    
+    **Requirements:**
+    - macOS 11 or newer
+    - At least 4GB of RAM
+    - Intel chip or Apple Silicon
+  </Tab>
+  
+  <Tab title="Linux">
+    Install Docker Engine and Docker Compose:
+    
+    ```bash
+    # Install Docker Engine
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    
+    # Add your user to the docker group
+    sudo usermod -aG docker $USER
+    
+    # Install Docker Compose plugin
+    sudo apt-get update
+    sudo apt-get install docker-compose-plugin
+    ```
+    
+    Alternatively, install [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/) if you prefer a GUI.
+  </Tab>
+</Tabs>
+
+<Check>
+  Verify Docker is installed correctly:
+  
+  ```bash
+  docker --version
+  docker compose version
+  ```
+</Check>
+
+## Quick Start with Docker
+
+Get a development server running in under 5 minutes.
+
+<Steps>
+  <Step title="Clone the repository">
+    <CodeGroup>
+    ```bash HTTPS
+    git clone https://github.com/learning-unlimited/ESP-Website.git devsite
+    cd devsite
+    ```
+    
+    ```bash SSH (if you have SSH keys set up)
+    git clone git@github.com:learning-unlimited/ESP-Website.git devsite
+    cd devsite
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Build and start the services">
+    ```bash
+    docker compose up --build
+    ```
+    
+    This command will:
+    - Build the Docker images (takes several minutes on first run)
+    - Start three containers: web (Django), db (PostgreSQL), and memcached
+    - Automatically run database migrations
+    - Collect static files
+    - Start the development server
+    
+    <Note>
+      The first build takes 5-10 minutes. Subsequent starts are much faster due to Docker layer caching.
+    </Note>
+  </Step>
+  
+  <Step title="Access the site">
+    Once you see `Starting development server at http://0.0.0.0:8000/`, open your browser to:
+    
+    ```
+    http://localhost:8000
+    ```
+    
+    You should see the ESP Website homepage!
+  </Step>
+  
+  <Step title="Create an admin account">
+    Open a new terminal window (keep the server running) and execute:
+    
+    ```bash
+    docker compose exec web python esp/manage.py createsuperuser
+    ```
+    
+    Follow the prompts to create your admin account.
+  </Step>
+</Steps>
+
+<Check>
+  Your development environment is ready! Log in at `http://localhost:8000/admin` with your superuser credentials.
+</Check>
+
+## Docker Architecture
+
+The Docker setup runs three interconnected containers:
+
+<CardGroup cols={3}>
+  <Card title="web" icon="server">
+    **Django Application**
+    - Python 3.7
+    - Django web framework
+    - Runs on port 8000
+    - Code is mounted from host
+  </Card>
+  <Card title="db" icon="database">
+    **PostgreSQL 14**
+    - Database server
+    - Data persisted in volume
+    - Accessible on port 5432
+  </Card>
+  <Card title="memcached" icon="memory">
+    **Memcached Cache**
+    - Caching layer
+    - Improves performance
+    - Runs on port 11211
+  </Card>
+</CardGroup>
+
+### What Happens on First Run?
+
+The `docker-entrypoint.sh` script automatically:
+
+1. Creates `local_settings.py` from the Docker template (if missing)
+2. Creates media symlinks (`images`, `styles`)
+3. Waits for PostgreSQL to be ready
+4. Runs database migrations
+5. Collects static files
+6. Starts the Django development server
+
+<Tip>
+  Your working copy is mounted into the container, so code changes on your host machine are reflected immediately. No rebuild needed for most changes!
+</Tip>
+
+## Common Docker Commands
+
+<AccordionGroup>
+  <Accordion title="Managing Containers" icon="docker">
+    **Stop containers:**
+    ```bash
+    docker compose down
+    ```
+    
+    **Stop and delete database (fresh start):**
+    ```bash
+    docker compose down -v
+    ```
+    
+    **Start containers (no rebuild):**
+    ```bash
+    docker compose up
+    ```
+    
+    **Rebuild containers:**
+    ```bash
+    docker compose down
+    docker compose up --build
+    ```
+    
+    **Force setup to re-run migrations:**
+    ```bash
+    FORCE_SETUP=1 docker compose up
+    ```
+  </Accordion>
+  
+  <Accordion title="Running Django Commands" icon="terminal">
+    Run any Django management command:
+    
+    ```bash
+    docker compose exec web python esp/manage.py <command>
+    ```
+    
+    **Common examples:**
+    
+    ```bash
+    # Open Django shell with auto-imported models
+    docker compose exec web python esp/manage.py shell_plus
+    
+    # Run database migrations
+    docker compose exec web python esp/manage.py migrate
+    
+    # Run tests
+    docker compose exec web python esp/manage.py test
+    
+    # Create a superuser
+    docker compose exec web python esp/manage.py createsuperuser
+    
+    # Collect static files
+    docker compose exec web python esp/manage.py collectstatic
+    ```
+  </Accordion>
+  
+  <Accordion title="Database Operations" icon="database">
+    **Access PostgreSQL shell:**
+    ```bash
+    docker compose exec db psql -U esp devsite_django
+    ```
+    
+    **View database tables:**
+    ```sql
+    \dt
+    ```
+    
+    **Backup database:**
+    ```bash
+    docker compose exec db pg_dump -U esp devsite_django > backup.sql
+    ```
+    
+    **Restore database:**
+    ```bash
+    docker compose down -v
+    docker compose up -d db
+    sleep 5
+    docker cp backup.sql $(docker compose ps -q db):/tmp/backup.sql
+    docker compose exec db psql -U esp devsite_django -f /tmp/backup.sql
+    ```
+  </Accordion>
+  
+  <Accordion title="Container Access" icon="right-to-bracket">
+    **Open bash shell in web container:**
+    ```bash
+    docker compose exec web bash
+    ```
+    
+    **View container logs:**
+    ```bash
+    docker compose logs web
+    docker compose logs db
+    docker compose logs memcached
+    ```
+    
+    **Follow logs in real-time:**
+    ```bash
+    docker compose logs -f web
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Loading an Existing Database
+
+If you have a database dump from a production site or previous development setup, you can load it into your Docker environment.
+
+<Steps>
+  <Step title="Start with a clean database">
+    ```bash
+    docker compose down -v
+    docker compose up -d
+    ```
+    
+    Wait a few seconds for PostgreSQL to initialize.
+  </Step>
+  
+  <Step title="Copy dump into container">
+    <CodeGroup>
+    ```bash Linux / macOS / WSL
+    docker cp /path/to/dump.sql $(docker compose ps -q db):/tmp/dump.sql
+    ```
+    
+    ```powershell Windows PowerShell
+    # First, get container ID
+    docker compose ps -q db
+    
+    # Then copy (replace <container-id>)
+    docker cp C:\path\to\dump.sql <container-id>:/tmp/dump.sql
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Load the dump">
+    <Tabs>
+      <Tab title="Plain SQL dump (.sql)">
+        ```bash
+        docker compose exec db psql -U esp devsite_django -f /tmp/dump.sql
+        ```
+      </Tab>
+      
+      <Tab title="Custom format (pg_dump -Fc)">
+        ```bash
+        docker compose exec db pg_restore --verbose \
+          --dbname=devsite_django --no-owner --no-acl \
+          -U esp /tmp/dump.sql
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Run migrations">
+    Ensure the schema matches the current code:
+    
+    ```bash
+    docker compose exec web python esp/manage.py migrate
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  If you see ownership or permission errors, the `--no-owner --no-acl` flags will help. For plain SQL dumps, you can safely ignore `ALTER OWNER` errors.
+</Warning>
+
+## Configuration
+
+The Docker setup uses `esp/esp/local_settings.py.docker` as the template for local settings.
+
+### Default Docker Configuration
+
+Key settings automatically configured for Docker:
+
+```python esp/esp/local_settings.py
+# Database connects to 'db' service
+DATABASES['default']['HOST'] = 'db'
+
+# Memcached connects to 'memcached' service  
+CACHES['default']['LOCATION'] = 'memcached:11211'
+
+# Allow all hosts (development only)
+ALLOWED_HOSTS = ['*']
+```
+
+### Customizing Settings
+
+<Steps>
+  <Step title="Edit local_settings.py">
+    After the first run, you can edit `esp/esp/local_settings.py` directly.
+    
+    This file is gitignored, so your changes won't be committed.
+  </Step>
+  
+  <Step title="Or modify the template">
+    To change defaults for all Docker users, edit:
+    
+    `esp/esp/local_settings.py.docker`
+  </Step>
+  
+  <Step title="Restart to apply changes">
+    ```bash
+    docker compose restart web
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use" icon="triangle-exclamation">
+    **Error:** `Bind for 0.0.0.0:8000 failed: port is already allocated`
+    
+    **Solution:** Either stop the conflicting service or change the port in `docker-compose.yml`:
+    
+    ```yaml docker-compose.yml
+    services:
+      web:
+        ports:
+          - "9000:8000"  # Access at localhost:9000
+    ```
+  </Accordion>
+  
+  <Accordion title="Database connection errors" icon="database">
+    **Error:** `could not connect to server: Connection refused`
+    
+    **Solution:** The entrypoint waits for PostgreSQL, but if you still see errors:
+    
+    ```bash
+    docker compose restart web
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission issues (Linux)" icon="lock">
+    **Error:** Files created inside container are owned by root
+    
+    **Solution:** Fix ownership on your host:
+    
+    ```bash
+    sudo chown -R $USER:$USER .
+    ```
+  </Accordion>
+  
+  <Accordion title="Stale containers after git pull" icon="git">
+    **Error:** Site seems broken after pulling new code
+    
+    **Solution:** Clean rebuild:
+    
+    ```bash
+    docker compose down -v
+    FORCE_SETUP=1 docker compose up --build
+    ```
+  </Accordion>
+  
+  <Accordion title="Build fails with 'invalid file request'" icon="circle-xmark">
+    **Error:** `invalid file request esp/public/media/images`
+    
+    **Solution:** Remove symlinks before rebuilding:
+    
+    ```bash
+    docker compose down
+    docker compose up --build
+    ```
+  </Accordion>
+  
+  <Accordion title="Docker Desktop not running" icon="docker">
+    **Windows error:** `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`
+    
+    **macOS error:** `Cannot connect to the Docker daemon`
+    
+    **Solution:** 
+    1. Open Docker Desktop
+    2. Wait for the icon to show it's ready
+    3. Verify with: `docker info`
+    4. Retry: `docker compose up --build`
+    
+    **Windows only:** Ensure "Use the WSL 2 based engine" is checked in Docker Desktop Settings → General.
+  </Accordion>
+</AccordionGroup>
+
+## Development Workflow
+
+Once your environment is set up, follow this workflow for making changes:
+
+<Steps>
+  <Step title="Create a feature branch">
+    ```bash
+    git checkout main
+    git pull
+    git checkout -b new-feature-name
+    ```
+  </Step>
+  
+  <Step title="Make your changes">
+    Edit code in your preferred editor on your host machine. Changes are immediately reflected in the running container.
+  </Step>
+  
+  <Step title="Run tests">
+    ```bash
+    docker compose exec web python esp/manage.py test
+    ```
+    
+    <Warning>
+      All tests must pass before submitting a pull request!
+    </Warning>
+  </Step>
+  
+  <Step title="Commit and push">
+    ```bash
+    git add .
+    git commit -m "Description of changes"
+    git push --set-upstream origin new-feature-name
+    ```
+  </Step>
+  
+  <Step title="Create a pull request">
+    Go to [GitHub](https://github.com/learning-unlimited/ESP-Website) and create a pull request from your branch.
+  </Step>
+</Steps>
+
+## Running Tests
+
+Testing is a critical part of the development workflow.
+
+<CodeGroup>
+```bash Run all tests
+docker compose exec web python esp/manage.py test
+```
+
+```bash Run tests for specific app
+docker compose exec web python esp/manage.py test esp.program.tests
+```
+
+```bash Run tests with verbose output
+docker compose exec web python esp/manage.py test --verbosity=2
+```
+
+```bash Run specific test class
+docker compose exec web python esp/manage.py test esp.program.tests.ProgramFrameworkTest
+```
+</CodeGroup>
+
+<Tip>
+  Tests run faster on subsequent runs because the test database is cached.
+</Tip>
+
+## Alternative: Native Installation
+
+While Docker is recommended, you can also run ESP Website natively on your machine.
+
+<Warning>
+  Native installation is more complex and requires managing Python versions, PostgreSQL, and other dependencies manually. Use Docker unless you have a specific reason not to.
+</Warning>
+
+<Accordion title="Show native installation instructions">
+  **Requirements:**
+  - Python 3.7
+  - PostgreSQL 12+
+  - Memcached
+  - Git
+  
+  **Steps:**
+  
+  1. Clone the repository:
+     ```bash
+     git clone https://github.com/learning-unlimited/ESP-Website.git devsite
+     cd devsite
+     ```
+  
+  2. Create a virtual environment:
+     ```bash
+     cd esp
+     ./make_virtualenv.sh
+     source env/bin/activate
+     ```
+  
+  3. Install dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ./packages_base_manual_install.sh
+     ```
+  
+  4. Set up PostgreSQL:
+     ```bash
+     createdb devsite_django
+     createuser esp
+     ```
+  
+  5. Configure local settings:
+     ```bash
+     cp esp/local_settings.py.example esp/local_settings.py
+     # Edit with your database credentials
+     ```
+  
+  6. Run migrations:
+     ```bash
+     ./manage.py migrate
+     ```
+  
+  7. Start the server:
+     ```bash
+     ./manage.py runserver
+     ```
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first program and learn the basics
+  </Card>
+  <Card
+    title="Contributing Guide"
+    icon="code-pull-request"
+    href="/dev/contributing"
+  >
+    Learn how to contribute code to the project
+  </Card>
+  <Card
+    title="Directory Structure"
+    icon="folder-tree"
+    href="/dev/directory-structure"
+  >
+    Explore the codebase organization
+  </Card>
+  <Card
+    title="Program Modules"
+    icon="puzzle-piece"
+    href="/dev/program-modules"
+  >
+    Understand the module system
+  </Card>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first program
+  </Card>
+  <Card
+    title="Directory Structure"
+    icon="folder-tree"
+    href="/directory-structure"
+  >
+    Understand how the codebase is organized
+  </Card>
+  <Card
+    title="Program Modules"
+    icon="puzzle-piece"
+    href="/program-modules"
+  >
+    Learn about the modular architecture
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues during installation:
+
+- Check the [GitHub Issues](https://github.com/learning-unlimited/ESP-Website/issues) for known problems
+- Review the [LU Wiki](https://wiki.learningu.org) for additional documentation
+- Ask in the Learning Unlimited developer community
+- Contact web-team@learningu.org for support

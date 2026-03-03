@@ -1,0 +1,482 @@
+---
+title: Utilities & Customizations
+description: Helper functions, template utilities, and customizations in the ESP Website
+---
+
+The ESP Website includes numerous utility functions and customizations that simplify common tasks. These utilities handle rendering, templates, testing, and various helper operations.
+
+## Rendering and Templates
+
+### render_to_response
+
+Use the ESP-specific `render_to_response` instead of Django's default. It automatically injects useful context variables:
+
+```python
+from esp.utils.web import render_to_response
+
+def my_view(request):
+    context = {
+        'students': Student.objects.filter(program=program),
+        'classes': ClassSubject.objects.all(),
+    }
+    return render_to_response(
+        'myapp/template.html',
+        request,
+        context
+    )
+```
+
+**Automatically injected context:**
+- `navbar_list`: Navigation bar items
+- `theme`: Theme settings from ThemeController
+- `current_theme_version`: Theme version tag
+- `current_logo_version`: Logo version tag  
+- `current_header_version`: Header version tag
+- `current_favicon_version`: Favicon version tag
+- `settings`: Django settings object
+- `current_programs`: Active programs list
+- `request`: The request object (when `use_request_context=True`)
+
+### Template Inheritance
+
+Almost all templates should inherit from the main layout:
+
+```django
+{% extends "main.html" %}
+
+{% block content %}
+    <h1>My Page Title</h1>
+    <p>Page content goes here...</p>
+{% endblock content %}
+```
+
+For minimal pages without the main layout:
+
+```django
+{% extends "elements/html" %}
+
+{% block body %}
+    <!-- Gets standard JS/CSS without navbar/footer -->
+{% endblock body %}
+```
+
+### Inline QSD (Quasi-Static Data)
+
+Create editable content blocks that admins can modify:
+
+```django
+{% load render_qsd %}
+
+{# Simple inline block #}
+{% render_inline_qsd "welcome_message" %}
+
+{# With default content #}
+{% inline_qsd_block "welcome_message" %}
+    <h2>Welcome to our program!</h2>
+    <p>This is the default welcome message.</p>
+{% end_inline_qsd_block %}
+
+{# Program-specific block #}
+{% render_inline_program_qsd program "program_description" %}
+
+{# Program-specific with default #}
+{% inline_program_qsd_block program "rules" %}
+    <h3>Program Rules</h3>
+    <ul>
+        <li>Be respectful</li>
+        <li>Have fun!</li>
+    </ul>
+{% end_inline_program_qsd_block %}
+```
+
+<Info>
+  In some templates, you may need to use `prog` instead of `program` depending on the context variable name.
+</Info>
+
+### TemplateOverride Model
+
+Override templates by storing them in the database:
+
+```python
+from esp.utils.models import TemplateOverride
+
+# Create a template override
+TemplateOverride.objects.create(
+    name='program/class_list.html',
+    content="""{% extends "main.html" %}
+    {% block content %}
+        <h1>Custom Class List</h1>
+        <!-- custom template content -->
+    {% endblock %}
+    """,
+    version=1
+)
+```
+
+This is commonly used for:
+- Theme editor customizations
+- Site-specific printables
+- Per-site template variations
+
+<Warning>
+  Template overrides can make debugging difficult. Use sparingly and document their existence.
+</Warning>
+
+## Helper Functions
+
+### get_from_id
+
+Safely retrieve objects by ID with error handling:
+
+```python
+from esp.utils.web import get_from_id
+from esp.program.models import Program
+
+# Get program by ID, raise ESPError if not found
+program = get_from_id(
+    request.GET.get('program_id'),
+    Program,
+    strtype='program',
+    error=True
+)
+
+# Get program by ID, return None if not found
+program = get_from_id(
+    request.GET.get('program_id'),
+    Program,
+    error=False
+)
+if program is None:
+    # handle missing program
+    pass
+```
+
+### esp_context_stuff
+
+Get common ESP context variables:
+
+```python
+from esp.utils.web import esp_context_stuff
+
+context = esp_context_stuff()
+# Returns dict with theme, settings, current_programs, etc.
+```
+
+Useful when building context manually outside of `render_to_response`.
+
+## Testing
+
+### Manual Testing
+
+<Warning>
+  Always test features manually on your dev server before pushing to production. Seriously, do it.
+</Warning>
+
+### Django Debug Toolbar
+
+The [Django Debug Toolbar](https://django-debug-toolbar.readthedocs.org) automatically appears on dev servers:
+
+- Shows SQL queries and execution time
+- Displays template rendering information
+- Shows cache operations
+- Helps debug performance issues
+- Reveals context variables
+
+### Automated Tests
+
+Run the test suite:
+
+```bash
+# Run all tests
+./manage.py test
+
+# Run specific app tests
+./manage.py test esp.program
+
+# Run specific test class
+./manage.py test esp.program.tests.ProgramTests
+
+# Run specific test method
+./manage.py test esp.program.tests.ProgramTests.test_creation
+```
+
+<Info>
+  Tests are automatically run by Travis CI when you push to GitHub. Write more tests to improve coverage!
+</Info>
+
+## Utility Modules
+
+The `esp/esp/utils/` directory contains many utility modules:
+
+### web.py
+
+```python
+from esp.utils.web import render_to_response, get_from_id
+```
+
+Rendering helpers and HTTP utilities.
+
+### decorators.py
+
+```python
+from esp.utils.decorators import cached_property
+
+class MyClass:
+    @cached_property
+    def expensive_property(self):
+        # Computed once, then cached
+        return expensive_computation()
+```
+
+### forms.py
+
+Custom form fields and widgets:
+
+```python
+from esp.utils.forms import NameField, PhoneNumberField
+from esp.utils.widgets import DateTimeWidget
+```
+
+### query_utils.py
+
+Database query helpers:
+
+```python
+from esp.utils.query_utils import nest_Q
+
+# Combine Q objects efficiently
+combined_q = nest_Q(q_objects, 'OR')
+```
+
+### sanitize.py
+
+HTML sanitization for user input:
+
+```python
+from esp.utils.sanitize import sanitize_html
+
+# Clean user-submitted HTML
+safe_html = sanitize_html(user_input)
+```
+
+### template.py
+
+Template loading and caching utilities.
+
+### latex.py
+
+LaTeX generation helpers:
+
+```python
+from esp.utils.latex import render_to_latex
+
+# Generate PDF from template
+pdf = render_to_latex('certificates/template.tex', context)
+```
+
+## Template Tags
+
+Custom template tags in `esp/esp/utils/templatetags/`:
+
+### markup.py
+
+```django
+{% load markup %}
+
+{{ content|markdown }}
+{{ content|restructuredtext }}
+```
+
+### query_builder.py
+
+```django
+{% load query_builder %}
+
+{% build_query program=program grade=9 %}
+```
+
+## Management Commands
+
+Custom management commands in `esp/esp/utils/management/commands/`:
+
+```bash
+# Flush cache
+./manage.py flushcache
+
+# Clean compiled Python files
+./manage.py clean_pyc
+
+# Install dependencies
+./manage.py install
+
+# Update database and static files
+./manage.py update
+```
+
+## Error Handling
+
+### ESPError
+
+Raise user-friendly errors:
+
+```python
+from esp.middleware import ESPError
+
+def my_view(request):
+    if not user.is_admin():
+        raise ESPError(
+            'You must be an administrator to access this page.',
+            log=False  # Don't log to error tracking
+        )
+```
+
+### Custom Error Views
+
+ESP overrides Django's error views to provide context:
+
+```python
+# In esp/utils/web.py
+def error404(request, exception=None, template_name='404.html'):
+    context = {
+        'request_path': request.path,
+        'DEFAULT_EMAIL_ADDRESSES': settings.DEFAULT_EMAIL_ADDRESSES
+    }
+    return render_to_response(template_name, request, context)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Use render_to_response">
+    Use ESP's `render_to_response` instead of Django's to ensure proper context:
+    
+    ```python
+    # GOOD
+    from esp.utils.web import render_to_response
+    return render_to_response('template.html', request, context)
+    
+    # BAD - missing ESP context
+    from django.shortcuts import render
+    return render(request, 'template.html', context)
+    ```
+  </Accordion>
+
+  <Accordion title="Inherit from main.html">
+    Use template inheritance for consistent layout:
+    
+    ```django
+    {% extends "main.html" %}
+    {% block content %}
+        <!-- your content -->
+    {% endblock %}
+    ```
+  </Accordion>
+
+  <Accordion title="Test Before Deploying">
+    - Test manually on dev server
+    - Check the debug toolbar for performance issues
+    - Write automated tests for new features
+    - Run existing tests to ensure no regressions
+  </Accordion>
+
+  <Accordion title="Use QSD for Admin-Editable Content">
+    Let admins edit content without code changes:
+    
+    ```django
+    {% load render_qsd %}
+    {% inline_program_qsd_block program "custom_rules" %}
+        Default rules content
+    {% end_inline_program_qsd_block %}
+    ```
+  </Accordion>
+
+  <Accordion title="Document Template Overrides">
+    If using `TemplateOverride`, document it clearly:
+    
+    ```python
+    # Create override with comment
+    TemplateOverride.objects.create(
+        name='program/printables/schedule.html',
+        content=custom_template,
+        version=1
+    )
+    # TODO: Document in site_customizations.md
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### View with Context
+
+```python
+from esp.utils.web import render_to_response
+from esp.program.models import Program
+
+def program_list(request):
+    programs = Program.objects.filter(anchor__parent__isnull=True)
+    
+    context = {
+        'programs': programs,
+        'nav_category': 'manage',
+    }
+    
+    return render_to_response(
+        'program/program_list.html',
+        request,
+        context
+    )
+```
+
+### Template with QSD
+
+```django
+{% extends "main.html" %}
+{% load render_qsd %}
+
+{% block content %}
+    <h1>{{ program.niceName }}</h1>
+    
+    {% inline_program_qsd_block program "welcome_message" %}
+        <p>Welcome to {{ program.niceName }}!</p>
+    {% end_inline_program_qsd_block %}
+    
+    <div class="class-list">
+        {% for cls in classes %}
+            <div class="class">{{ cls.title }}</div>
+        {% endfor %}
+    </div>
+{% endblock %}
+```
+
+### Form with Custom Fields
+
+```python
+from django import forms
+from esp.utils.forms import NameField, PhoneNumberField
+from esp.utils.widgets import DateTimeWidget
+
+class RegistrationForm(forms.Form):
+    name = NameField()
+    phone = PhoneNumberField(required=False)
+    preferred_time = forms.DateTimeField(
+        widget=DateTimeWidget(),
+        required=False
+    )
+```
+
+## Additional Resources
+
+- **Caching**: See [cache.mdx](/dev/cache) for the caching library details
+- **Email**: See [email.mdx](/dev/email) for email system documentation  
+- **Tags**: See [tags.mdx](/dev/tags) for the tag system
+- **Django Debug Toolbar**: [Documentation](https://django-debug-toolbar.readthedocs.org)
+- **Django Testing**: [Django testing docs](https://docs.djangoproject.com/en/stable/topics/testing/)
+
+## Related Files
+
+- Rendering utilities: `esp/esp/utils/web.py`
+- Template model: `esp/esp/utils/models.py`
+- Custom decorators: `esp/esp/utils/decorators.py`
+- Form utilities: `esp/esp/utils/forms.py`
+- Template tags: `esp/esp/utils/templatetags/`

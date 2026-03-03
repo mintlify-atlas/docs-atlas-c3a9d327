@@ -1,0 +1,253 @@
+---
+title: "Welcome to ESP Website"
+description: "A powerful platform for managing educational programs like MIT Splash, built by Learning Unlimited"
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Hero Dark"
+/>
+
+## What is ESP Website?
+
+ESP Website is a comprehensive platform designed to help manage the logistics of preparing for and running large, short-term educational programs. Originally created for MIT Splash and maintained by members and alumni of the interscholastic Splash community and [Learning Unlimited](https://learningu.org), it powers educational programs worldwide.
+
+The platform handles everything from student and teacher registration to class scheduling, payments, communications, and on-site management.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Student Registration"
+    icon="graduation-cap"
+    href="#student-features"
+  >
+    Intuitive class browsing, lottery registration, waitlists, and real-time schedule management
+  </Card>
+  <Card
+    title="Teacher Management"
+    icon="chalkboard-user"
+    href="#teacher-features"
+  >
+    Class creation, availability tracking, student app reviews, and materials upload
+  </Card>
+  <Card
+    title="Admin Tools"
+    icon="screwdriver-wrench"
+    href="#admin-features"
+  >
+    Powerful scheduling, communications, financial aid processing, and program dashboards
+  </Card>
+  <Card
+    title="Payment Processing"
+    icon="credit-card"
+    href="#payments"
+  >
+    Integrated Stripe and Cybersource support with line items, discounts, and financial aid
+  </Card>
+</CardGroup>
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get started with your first program in minutes
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Set up a local development environment
+  </Card>
+  <Card
+    title="Program Modules"
+    icon="puzzle-piece"
+    href="/admin/program-modules"
+  >
+    Learn about the modular system for customizing your program
+  </Card>
+  <Card
+    title="GitHub Repository"
+    icon="github"
+    href="https://github.com/learning-unlimited/ESP-Website"
+  >
+    View the source code and contribute
+  </Card>
+</CardGroup>
+
+## Student Features
+
+ESP Website provides students with a seamless registration experience:
+
+- **Class Catalog**: Browse classes with filtering by category, difficulty, grade level, and more
+- **Multiple Registration Modes**: Support for lottery registration, priority-based selection, and first-come-first-served
+- **Real-time Schedule**: View your schedule with classroom locations and teacher information
+- **Financial Aid**: Built-in financial aid application and approval workflow
+- **Optional Purchases**: Add meals, t-shirts, and other items during registration
+- **Mobile-Friendly**: Student webapp for on-site schedule viewing, class changes, and surveys
+
+## Teacher Features
+
+Teachers can easily manage their classes through the platform:
+
+- **Class Creation**: Create multiple class sections with detailed descriptions and materials
+- **Availability Management**: Indicate when you're available to teach
+- **Student Applications**: Create custom application questions for your classes
+- **Materials Upload**: Share class materials and resources with students
+- **Teacher Training**: Sign up for required training sessions and interviews
+- **Attendance Tracking**: Mark student attendance through the web interface or mobile app
+
+## Admin Features
+
+Program administrators have access to powerful management tools:
+
+- **AJAX Scheduler**: Visual drag-and-drop interface for assigning classes to rooms and times
+- **Communications Panel**: Send targeted emails to students, teachers, and other user groups
+- **Dashboard & Analytics**: Real-time statistics on registrations, payments, and program health
+- **Resource Management**: Manage classrooms, equipment, and time blocks
+- **Class Review**: Approve, edit, and manage submitted classes
+- **Financial Aid Processing**: Review and approve financial aid applications
+- **Custom Forms**: Create surveys and collect additional information
+- **Program Modules**: Enable only the features you need for each program
+
+## Payments
+
+ESP Website integrates with major payment processors:
+
+- **Stripe Integration**: Accept credit card payments with automatic receipt generation
+- **Cybersource Support**: Enterprise payment processing (used by MIT)
+- **Flexible Line Items**: Configure program fees, optional purchases, and donations
+- **Financial Aid**: Automatic discounts and grants
+- **Sibling Discounts**: Built-in support for family discounts
+
+## Program Module System
+
+One of ESP Website's most powerful features is its modular architecture. Each program can enable only the modules it needs:
+
+<AccordionGroup>
+  <Accordion title="Student Modules">
+    - Student Class Registration (catalog, schedule, enrollment)
+    - Lottery Registration (two-phase and priority-based)
+    - Student Profile Editor
+    - Financial Aid Application
+    - Extra Costs (meals, t-shirts)
+    - Student Acknowledgement
+    - Surveys
+    - Student Onsite Webapp
+  </Accordion>
+  
+  <Accordion title="Teacher Modules">
+    - Teacher Class Registration (create and edit classes)
+    - Teacher Availability
+    - Teacher Profile Editor
+    - Teacher Bio and Photo Upload
+    - Teacher Events (training/interview signup)
+    - Teacher Quiz (logistics verification)
+    - Application Reviews
+    - Teacher Onsite Webapp
+  </Accordion>
+  
+  <Accordion title="Admin Modules">
+    - AJAX Scheduling Module
+    - Communications Panel
+    - Admin Dashboard (AdminCore)
+    - Class Management
+    - User Morphing (view site as another user)
+    - Admin Review Apps
+    - Vitals Display
+  </Accordion>
+  
+  <Accordion title="Management Modules">
+    - Resource Management (rooms, time blocks)
+    - Volunteer Management
+    - Payment Processing (Stripe/Cybersource)
+    - Program Printables (rosters, schedules)
+    - Survey Creation and Results
+  </Accordion>
+</AccordionGroup>
+
+## Technology Stack
+
+ESP Website is built with proven, reliable technologies:
+
+- **Backend**: Django (Python web framework)
+- **Database**: PostgreSQL 14
+- **Caching**: Memcached
+- **Frontend**: JavaScript, jQuery, Bootstrap
+- **Deployment**: Docker, Docker Compose
+- **Version Control**: Git, GitHub
+
+## Who Uses ESP Website?
+
+ESP Website powers educational programs at universities and organizations worldwide:
+
+- **MIT Splash**: Weekend educational programs at MIT
+- **Learning Unlimited Chapters**: Programs at universities across the US and internationally
+- **HSSP (High School Studies Program)**: Multi-week enrichment programs
+- **Other Educational Initiatives**: Custom programs using the flexible module system
+
+## Community & Support
+
+<CardGroup cols={2}>
+  <Card
+    title="LU Wiki"
+    icon="book"
+    href="https://wiki.learningu.org"
+  >
+    Additional documentation for Learning Unlimited chapters
+  </Card>
+  <Card
+    title="Contribute"
+    icon="code-pull-request"
+    href="https://github.com/learning-unlimited/ESP-Website/wiki#i-want-to-get-involved"
+  >
+    Learn how to contribute to the project
+  </Card>
+  <Card
+    title="Code of Conduct"
+    icon="hand-holding-heart"
+    href="https://github.com/learning-unlimited/ESP-Website?tab=coc-ov-file"
+  >
+    Our community standards and expectations
+  </Card>
+  <Card
+    title="Contact"
+    icon="envelope"
+    href="mailto:web-team@learningu.org"
+  >
+    Get in touch with the development team
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+Ready to get started? Follow our quickstart guide to set up your first program:
+
+<Card
+  title="Quickstart Guide"
+  icon="play"
+  href="/quickstart"
+>
+  Set up ESP Website and create your first program in under 30 minutes
+</Card>
+
+Or if you're a developer looking to contribute or customize the platform:
+
+<Card
+  title="Installation Guide"
+  icon="code"
+  href="/installation"
+>
+  Set up a local development environment with Docker
+</Card>

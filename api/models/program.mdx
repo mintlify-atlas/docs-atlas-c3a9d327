@@ -1,0 +1,272 @@
+---
+title: Program Model
+description: Core model representing educational programs like MIT Splash, HSSP, and Junction
+---
+
+## Overview
+
+The `Program` model is the central model in the ESP Website, representing educational programs such as Splash, HSSP, Junction, and Delve. Each program instance has its own URL, grade range, modules, and settings.
+
+**Source:** `esp/esp/program/models/__init__.py:254`
+
+## Model Fields
+
+<ParamField path="url" type="CharField" required>
+  Unique URL identifier for the program (e.g., "Splash/2024")
+  - Max length: 80 characters
+  - Must be unique across all programs
+</ParamField>
+
+<ParamField path="name" type="CharField" required>
+  Display name of the program (e.g., "Splash 2024")
+  - Max length: 80 characters
+</ParamField>
+
+<ParamField path="grade_min" type="IntegerField" required>
+  Minimum grade level allowed for student participation
+</ParamField>
+
+<ParamField path="grade_max" type="IntegerField" required>
+  Maximum grade level allowed for student participation
+</ParamField>
+
+<ParamField path="director_email" type="EmailField" required>
+  Director contact email address used for from field and display
+  - Default: `info@{SITE_INFO[1]}`
+  - Must end in your site domain or @learningu.org
+  - Max length: 75 characters
+</ParamField>
+
+<ParamField path="director_cc_email" type="EmailField">
+  Carbon-copy address for automated outgoing mail (except class cancellations)
+  - If set, automated emails go here instead of director_email
+  - Use to avoid spamming director email with teacher registration emails
+  - Max length: 75 characters
+</ParamField>
+
+<ParamField path="director_confidential_email" type="EmailField">
+  Email address for confidential communications like financial aid applications
+  - If set, confidential emails go here instead of director_email
+  - Max length: 75 characters
+</ParamField>
+
+<ParamField path="program_size_max" type="IntegerField">
+  Maximum number of students allowed to register
+  - Set to 0 for no cap
+  - Performance is best when no cap is set
+</ParamField>
+
+<ParamField path="program_allow_waitlist" type="BooleanField">
+  Whether to enable waitlist functionality when program is full
+  - Default: False
+</ParamField>
+
+## Relationships
+
+<ParamField path="program_modules" type="ManyToManyField">
+  Set of enabled program functionalities
+  - Links to: `ProgramModule`
+  - See [program modules documentation](https://github.com/learning-unlimited/ESP-Website/blob/main/docs/admin/program_modules.rst)
+</ParamField>
+
+<ParamField path="class_categories" type="ManyToManyField">
+  Categories available for organizing classes in this program
+  - Links to: `ClassCategories`
+  - Blank allowed
+</ParamField>
+
+<ParamField path="flag_types" type="ManyToManyField">
+  Flag types that can be used to tag classes
+  - Links to: `ClassFlagType`
+  - Blank allowed
+</ParamField>
+
+<ParamField path="documents" type="GenericRelation">
+  Media files and documents attached to the program
+  - Links to: `Media`
+</ParamField>
+
+## Key Methods
+
+### URL Generation
+
+<ResponseField name="get_absolute_url()" type="string">
+  Returns the admin URL for the program
+  
+  **Returns:** `/manage/{url}/main`
+  
+  **Example:**
+  ```python
+  program = Program.objects.get(url='Splash/2024')
+  print(program.get_absolute_url())  # "/manage/Splash/2024/main"
+  ```
+</ResponseField>
+
+<ResponseField name="get_teach_url()" type="string">
+  Returns the teacher-facing URL
+  
+  **Returns:** `/teach/{url}/`
+</ResponseField>
+
+<ResponseField name="get_learn_url()" type="string">
+  Returns the student-facing URL
+  
+  **Returns:** `/learn/{url}/`
+</ResponseField>
+
+<ResponseField name="get_manage_url()" type="string">
+  Returns the management URL
+  
+  **Returns:** `/manage/{url}/`
+</ResponseField>
+
+<ResponseField name="get_onsite_url()" type="string">
+  Returns the onsite URL
+  
+  **Returns:** `/onsite/{url}/`
+</ResponseField>
+
+### User Queries
+
+<ResponseField name="students(QObjects=False)" type="dict">
+  Returns dictionary of different sets of students for this program
+  
+  **Parameters:**
+  - `QObjects` (bool): If True, returns Q objects instead of querysets
+  
+  **Returns:** OrderedDict with student categories (e.g., enrolled, registered)
+  
+  **Example:**
+  ```python
+  program = Program.objects.get(url='Splash/2024')
+  student_dict = program.students()
+  enrolled = student_dict.get('enrolled')
+  ```
+</ResponseField>
+
+<ResponseField name="teachers(QObjects=False)" type="dict">
+  Returns dictionary of different sets of teachers for this program
+  
+  **Parameters:**
+  - `QObjects` (bool): If True, returns Q objects instead of querysets
+  
+  **Returns:** OrderedDict with teacher categories
+</ResponseField>
+
+<ResponseField name="volunteers(QObjects=False)" type="dict">
+  Returns dictionary of different sets of volunteers for this program
+  
+  **Parameters:**
+  - `QObjects` (bool): If True, returns Q objects instead of querysets
+  
+  **Returns:** OrderedDict with volunteer categories
+</ResponseField>
+
+### Utility Methods
+
+<ResponseField name="niceName()" type="string">
+  Returns human-readable name of the program
+  
+  **Returns:** Value of the `name` field
+</ResponseField>
+
+<ResponseField name="grades()" type="list">
+  Returns list of all grades eligible for the program
+  
+  **Returns:** List of integers from grade_min to grade_max (inclusive)
+  
+  **Example:**
+  ```python
+  program = Program.objects.get(url='Splash/2024')
+  program.grade_min = 7
+  program.grade_max = 12
+  print(program.grades())  # [7, 8, 9, 10, 11, 12]
+  ```
+</ResponseField>
+
+<ResponseField name="isUsingStudentApps()" type="bool">
+  Checks if this program uses student applications
+  
+  **Returns:** True if StudentAppQuestion objects exist for this program
+  
+  **Cached:** Yes (depends on StudentAppQuestion model)
+</ResponseField>
+
+## Properties
+
+<ResponseField name="program_type" type="string">
+  The type of program (first part of URL)
+  
+  **Example:** For url="Splash/2024", returns "Splash"
+</ResponseField>
+
+<ResponseField name="program_instance" type="string">
+  The specific instance identifier (remaining parts of URL)
+  
+  **Example:** For url="Splash/2024", returns "2024"
+</ResponseField>
+
+## Usage Examples
+
+### Creating a New Program
+
+```python
+from esp.program.models import Program
+
+program = Program.objects.create(
+    url='Splash/2024',
+    name='Splash 2024',
+    grade_min=7,
+    grade_max=12,
+    director_email='splash-directors@example.org',
+    program_size_max=1000,
+    program_allow_waitlist=True
+)
+```
+
+### Getting Students in a Program
+
+```python
+program = Program.objects.get(url='Splash/2024')
+
+# Get all student categories
+student_dict = program.students()
+
+# Get count of students
+student_counts = program.num_students()
+
+for category, count in student_counts.items():
+    print(f"{category}: {count} students")
+```
+
+### Working with Program Modules
+
+```python
+from esp.program.models import Program, ProgramModule
+
+program = Program.objects.get(url='Splash/2024')
+
+# Add a module to the program
+student_reg_module = ProgramModule.objects.get(handler='StudentClassRegModule')
+program.program_modules.add(student_reg_module)
+
+# Check if program has a specific module
+has_lottery = program.hasModule('StudentLotteryFrontendModule')
+```
+
+### Accessing Program URLs
+
+```python
+program = Program.objects.get(url='Splash/2024')
+
+print(f"Students register at: {program.get_learn_url()}")
+print(f"Teachers submit classes at: {program.get_teach_url()}")
+print(f"Admins manage at: {program.get_manage_url()}")
+```
+
+## Related Models
+
+- [ClassSubject](/api/models/class) - Classes offered in a program
+- [User](/api/models/user) - Students, teachers, and administrators
+- [Registration](/api/models/registration) - Student enrollments in classes
+- [Resources](/api/models/resources) - Classrooms and equipment for the program

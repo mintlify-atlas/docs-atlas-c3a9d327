@@ -1,0 +1,538 @@
+---
+title: User Model (ESPUser)
+description: Extended user model for students, teachers, and administrators in ESP programs
+---
+
+## Overview
+
+The `ESPUser` model extends Django's built-in User model with ESP-specific functionality for managing students, teachers, volunteers, guardians, and administrators.
+
+**Source:** `esp/esp/users/models/__init__.py`
+
+## Core Fields
+
+ESPUser inherits from Django's User model, which provides:
+
+<ParamField path="username" type="CharField" required>
+  Unique username for login
+  - Max length: 150 characters
+  - Must be unique
+</ParamField>
+
+<ParamField path="first_name" type="CharField">
+  User's first name
+  - Max length: 150 characters
+</ParamField>
+
+<ParamField path="last_name" type="CharField">
+  User's last name
+  - Max length: 150 characters
+</ParamField>
+
+<ParamField path="email" type="EmailField">
+  User's email address
+  - Max length: 254 characters
+  - Used for notifications and password recovery
+</ParamField>
+
+<ParamField path="is_staff" type="BooleanField">
+  Django admin panel access
+  - Default: False
+</ParamField>
+
+<ParamField path="is_superuser" type="BooleanField">
+  Full Django permissions
+  - Default: False
+</ParamField>
+
+<ParamField path="groups" type="ManyToManyField">
+  User roles/types
+  - Links to: Django `Group` model
+  - Common groups: Student, Teacher, Administrator, Guardian, Educator, Volunteer
+</ParamField>
+
+## User Type Methods
+
+ESP automatically creates membership methods for each user type.
+
+<ResponseField name="isStudent()" type="bool">
+  Checks if user is a student
+  
+  **Returns:** True if user is in the Student group
+  
+  **Example:**
+  ```python
+  user = ESPUser.objects.get(username='jsmith')
+  if user.isStudent():
+      print("This is a student account")
+  ```
+</ResponseField>
+
+<ResponseField name="isTeacher()" type="bool">
+  Checks if user is a teacher/volunteer instructor
+  
+  **Returns:** True if user is in the Teacher group
+</ResponseField>
+
+<ResponseField name="isAdministrator(program=None)" type="bool">
+  Checks if user has admin privileges
+  
+  **Parameters:**
+  - `program` (Program): Check for program-specific admin rights, or global if None
+  
+  **Returns:** True if user has Administrator role or Administer permission
+  
+  **Cached:** Yes
+  
+  **Example:**
+  ```python
+  from esp.program.models import Program
+  
+  user = ESPUser.objects.get(username='admin')
+  program = Program.objects.get(url='Splash/2024')
+  
+  if user.isAdministrator(program):
+      print("User can manage this program")
+  ```
+</ResponseField>
+
+<ResponseField name="isGuardian()" type="bool">
+  Checks if user is a guardian/parent
+  
+  **Returns:** True if user is in the Guardian group
+</ResponseField>
+
+<ResponseField name="isEducator()" type="bool">
+  Checks if user is a K-12 educator
+  
+  **Returns:** True if user is in the Educator group
+</ResponseField>
+
+<ResponseField name="isVolunteer()" type="bool">
+  Checks if user is an onsite volunteer
+  
+  **Returns:** True if user is in the Volunteer group
+</ResponseField>
+
+## Name and Contact Methods
+
+<ResponseField name="name()" type="string">
+  Returns full name
+  
+  **Returns:** "{first_name} {last_name}"
+  
+  **Example:**
+  ```python
+  user.first_name = "Jane"
+  user.last_name = "Doe"
+  print(user.name())  # "Jane Doe"
+  ```
+</ResponseField>
+
+<ResponseField name="name_last_first()" type="string">
+  Returns name in last, first format
+  
+  **Returns:** "{last_name}, {first_name}"
+</ResponseField>
+
+<ResponseField name="get_email_sendto_address()" type="string">
+  Returns properly formatted email address for sending mail
+  
+  **Returns:** `"Full Name" <email@example.com>`
+  
+  **Example:**
+  ```python
+  from_addr = user.get_email_sendto_address()
+  send_mail('Subject', 'Message', from_addr, [recipient])
+  ```
+</ResponseField>
+
+## Grade and Student Methods
+
+<ResponseField name="getGrade(program=None)" type="int">
+  Gets student's grade level
+  
+  **Parameters:**
+  - `program` (Program): Calculate grade for specific program, or current year if None
+  
+  **Returns:** Integer grade (7-12 typically), or 0 if not a student
+  
+  **Cached:** Yes
+  
+  **Example:**
+  ```python
+  student = ESPUser.objects.get(username='student123')
+  program = Program.objects.get(url='Splash/2024')
+  grade = student.getGrade(program)
+  print(f"Student is in grade {grade}")
+  ```
+</ResponseField>
+
+<ResponseField name="getYOG(program=None)" type="int">
+  Gets student's year of graduation
+  
+  **Parameters:**
+  - `program` (Program): Use registration profile from program, or latest if None
+  
+  **Returns:** Graduation year (e.g., 2025) or None
+  
+  **Cached:** Yes
+</ResponseField>
+
+<ResponseField name="set_grade(grade)">
+  Sets student's grade level based on current school year
+  
+  **Parameters:**
+  - `grade` (int): Grade level to set
+  
+  **Behavior:**
+  - Calculates graduation year from grade
+  - Updates StudentInfo record
+  - Only works for students
+  
+  **Example:**
+  ```python
+  student.set_grade(10)  # Sets as 10th grader
+  ```
+</ResponseField>
+
+<ResponseField name="set_student_grad_year(grad_year)">
+  Directly sets graduation year
+  
+  **Parameters:**
+  - `grad_year` (int): Year of graduation
+  
+  **Behavior:**
+  - Updates StudentInfo.graduation_year
+  - Only works for students
+</ResponseField>
+
+## Teaching Methods
+
+<ResponseField name="getTaughtClasses(program=None, include_rejected=False, include_cancelled=True)" type="QuerySet">
+  Returns classes taught by this user
+  
+  **Parameters:**
+  - `program` (Program): Filter by program, or all programs if None
+  - `include_rejected` (bool): Include rejected classes
+  - `include_cancelled` (bool): Include cancelled classes
+  
+  **Returns:** QuerySet of ClassSubject objects
+  
+  **Cached:** Yes (when program specified)
+  
+  **Example:**
+  ```python
+  teacher = ESPUser.objects.get(username='teacher1')
+  program = Program.objects.get(url='Splash/2024')
+  classes = teacher.getTaughtClasses(program)
+  
+  for cls in classes:
+      print(f"{cls.emailcode()}: {cls.title}")
+  ```
+</ResponseField>
+
+<ResponseField name="getTaughtSections(program=None, include_rejected=False, include_cancelled=True)" type="QuerySet">
+  Returns class sections taught by this user
+  
+  **Parameters:**
+  - `program` (Program): Filter by program
+  - `include_rejected` (bool): Include rejected sections
+  - `include_cancelled` (bool): Include cancelled sections
+  
+  **Returns:** QuerySet of ClassSection objects
+  
+  **Cached:** Yes
+</ResponseField>
+
+<ResponseField name="getTaughtPrograms()" type="QuerySet">
+  Returns all programs where user has taught
+  
+  **Returns:** QuerySet of Program objects
+</ResponseField>
+
+<ResponseField name="getTaughtTime(program=None, include_scheduled=True, round_to=0.0)" type="timedelta">
+  Calculates total teaching time
+  
+  **Parameters:**
+  - `program` (Program): Filter by program
+  - `include_scheduled` (bool): Count already-scheduled classes
+  - `round_to` (float): Round to nearest fraction of hour (0 = no rounding)
+  
+  **Returns:** timedelta object with total hours
+  
+  **Example:**
+  ```python
+  time = teacher.getTaughtTime(program)
+  hours = time.total_seconds() / 3600
+  print(f"Teaching {hours} hours")
+  ```
+</ResponseField>
+
+<ResponseField name="getAvailableTimes(program, ignore_classes=False)" type="list">
+  Returns time blocks when teacher is available
+  
+  **Parameters:**
+  - `program` (Program): Program to check availability for
+  - `ignore_classes` (bool): Don't exclude times they're teaching
+  
+  **Returns:** List of Event objects
+  
+  **Cached:** Yes
+  
+  **Example:**
+  ```python
+  available = teacher.getAvailableTimes(program)
+  for timeslot in available:
+      print(f"{timeslot.start} - {timeslot.end}")
+  ```
+</ResponseField>
+
+## Student Enrollment Methods
+
+<ResponseField name="getEnrolledClasses(program=None)" type="QuerySet">
+  Returns classes student is enrolled in
+  
+  **Parameters:**
+  - `program` (Program): Filter by program, or all if None
+  
+  **Returns:** QuerySet of ClassSubject objects
+  
+  **Example:**
+  ```python
+  student = ESPUser.objects.get(username='student123')
+  program = Program.objects.get(url='Splash/2024')
+  classes = student.getEnrolledClasses(program)
+  
+  print(f"{student.name()} is enrolled in {classes.count()} classes")
+  ```
+</ResponseField>
+
+<ResponseField name="getEnrolledSections(program=None)" type="list">
+  Returns class sections student is enrolled in
+  
+  **Parameters:**
+  - `program` (Program): Filter by program
+  
+  **Returns:** List of ClassSection objects
+  
+  **Cached:** Yes (when program specified)
+</ResponseField>
+
+<ResponseField name="getSections(program=None, verbs=None)" type="QuerySet">
+  Returns sections with specified relationship type
+  
+  **Parameters:**
+  - `program` (Program): Filter by program
+  - `verbs` (list): Registration types (e.g., ['Enrolled', 'Interested'])
+  
+  **Returns:** QuerySet of ClassSection objects
+  
+  **Example:**
+  ```python
+  # Get priority/lottery selections
+  priority = student.getSections(program, verbs=['Priority/1', 'Priority/2'])
+  ```
+</ResponseField>
+
+<ResponseField name="isEnrolledInClass(clsObj)" type="bool">
+  Checks if student is enrolled in specific class
+  
+  **Parameters:**
+  - `clsObj` (ClassSubject): Class to check
+  
+  **Returns:** True if student has any section of this class
+</ResponseField>
+
+## Permission Methods
+
+<ResponseField name="canEdit(cls)" type="bool">
+  Checks if user can edit a class
+  
+  **Parameters:**
+  - `cls` (ClassSubject): Class to check
+  
+  **Returns:** True if user is teacher of class or program admin
+</ResponseField>
+
+<ResponseField name="canMod(sec)" type="bool">
+  Checks if user can moderate a section
+  
+  **Parameters:**
+  - `sec` (ClassSection): Section to check
+  
+  **Returns:** True if user is moderator, teacher, or program admin
+</ResponseField>
+
+<ResponseField name="canRegToFullProgram(program)" type="bool">
+  Checks if user can register even when program is full
+  
+  **Parameters:**
+  - `program` (Program): Program to check
+  
+  **Returns:** True if user has OverrideFull permission
+</ResponseField>
+
+<ResponseField name="isOnsite(program=None)" type="bool">
+  Checks if user has onsite access
+  
+  **Parameters:**
+  - `program` (Program): Check for specific program, or all if None
+  
+  **Returns:** True if user has Onsite permission
+</ResponseField>
+
+## Role Management
+
+<ResponseField name="makeRole(role_name)">
+  Adds a role/group to user
+  
+  **Parameters:**
+  - `role_name` (string): Name of group (e.g., "Teacher", "Volunteer")
+  
+  **Example:**
+  ```python
+  user.makeRole('Teacher')
+  user.makeRole('Volunteer')
+  ```
+</ResponseField>
+
+<ResponseField name="removeRole(role_name)">
+  Removes a role/group from user
+  
+  **Parameters:**
+  - `role_name` (string): Name of group to remove
+</ResponseField>
+
+<ResponseField name="hasRole(role_name)" type="bool">
+  Checks if user has specific role
+  
+  **Parameters:**
+  - `role_name` (string): Group name to check
+  
+  **Returns:** True if user is in the group
+</ResponseField>
+
+<ResponseField name="getUserTypes()" type="list">
+  Returns all roles/types for this user
+  
+  **Returns:** List of group names (e.g., ['Student', 'Teacher'])
+  
+  **Example:**
+  ```python
+  types = user.getUserTypes()
+  print(f"User roles: {', '.join(types)}")
+  ```
+</ResponseField>
+
+## Authentication
+
+<ResponseField name="switch_to_user(request, user, retUrl, retTitle, onsite=False)">
+  Morphs into another user (admin feature)
+  
+  **Parameters:**
+  - `request`: Django request object
+  - `user` (ESPUser): User to become
+  - `retUrl` (string): URL to return to when switching back
+  - `retTitle` (string): Display text for return link
+  - `onsite` (bool): Whether this is onsite morphing
+  
+  **Security:** Cannot morph into administrators
+  
+  **Example:**
+  ```python
+  # Admin morphing to help a student
+  admin.switch_to_user(request, student, '/manage/', 'Back to Admin', False)
+  ```
+</ResponseField>
+
+<ResponseField name="switch_back(request)" type="string">
+  Returns to original user after morphing
+  
+  **Returns:** URL to redirect to
+</ResponseField>
+
+<ResponseField name="is_morphed(request=None)" type="bool">
+  Checks if currently morphed as another user
+  
+  **Returns:** True if session contains morph data
+</ResponseField>
+
+## Usage Examples
+
+### Creating Users
+
+```python
+from esp.users.models import ESPUser
+
+# Create a student
+student = ESPUser.objects.create_user(
+    username='jsmith',
+    email='jsmith@example.com',
+    first_name='John',
+    last_name='Smith',
+    password='securepassword'
+)
+student.makeRole('Student')
+student.set_grade(10)
+
+# Create a teacher
+teacher = ESPUser.objects.create_user(
+    username='mjones',
+    email='mjones@example.com',
+    first_name='Mary',
+    last_name='Jones'
+)
+teacher.makeRole('Teacher')
+```
+
+### Checking User Classes
+
+```python
+from esp.program.models import Program
+
+program = Program.objects.get(url='Splash/2024')
+user = ESPUser.objects.get(username='jsmith')
+
+if user.isStudent():
+    # Get student's schedule
+    classes = user.getEnrolledClasses(program)
+    print(f"Enrolled in {classes.count()} classes:")
+    for cls in classes:
+        print(f"  - {cls.title}")
+        
+elif user.isTeacher():
+    # Get teacher's classes
+    classes = user.getTaughtClasses(program)
+    print(f"Teaching {classes.count()} classes:")
+    for cls in classes:
+        sections = cls.get_sections()
+        print(f"  - {cls.title} ({sections.count()} sections)")
+```
+
+### Managing Availability
+
+```python
+from esp.cal.models import Event
+
+teacher = ESPUser.objects.get(username='teacher1')
+program = Program.objects.get(url='Splash/2024')
+
+# Set teacher availability
+timeslots = Event.objects.filter(program=program)
+for slot in timeslots:
+    teacher.addAvailableTime(program, slot)
+
+# Check available times
+available = teacher.getAvailableTimes(program)
+print(f"Available for {len(available)} time blocks")
+```
+
+## Related Models
+
+- [Program](/api/models/program) - Programs users participate in
+- [ClassSubject](/api/models/class) - Classes users teach or take
+- [Registration](/api/models/registration) - Student enrollments
+- `ContactInfo` - Phone numbers and addresses
+- `StudentInfo` - Student-specific data (grade, school)
+- `TeacherInfo` - Teacher-specific data (bio, availability)

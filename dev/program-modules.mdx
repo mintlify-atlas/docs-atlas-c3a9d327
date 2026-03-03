@@ -1,0 +1,649 @@
+---
+title: Program modules development
+description: Guide to developing program modules for ESP Website
+---
+
+Program modules are the core extensibility mechanism in ESP Website. Each module provides a specific feature or workflow, such as student registration, teacher class creation, or admin scheduling.
+
+## What Are Program Modules?
+
+A **program module** is a self-contained component that:
+- Handles a specific workflow (e.g., student registration)
+- Provides one or more views (web pages)
+- Can be enabled/disabled per program
+- Has configurable settings and requirements
+- Follows a consistent architecture
+
+**Examples**:
+- `StudentRegCore` - Main student registration page
+- `TeacherClassRegModule` - Teacher class creation
+- `AdminCore` - Admin dashboard
+- `OnSiteCheckinModule` - Student check-in
+
+## Module Architecture
+
+### Components
+
+Each module consists of:
+
+1. **Handler Class** (`esp/esp/program/modules/handlers/{name}module.py`)
+   - Python class inheriting from `ProgramModuleObj`
+   - Defines views, permissions, and configuration
+
+2. **Templates** (`esp/templates/program/modules/{name}/`)
+   - HTML templates for the module's views
+
+3. **Database Record** (`ProgramModuleObj`)
+   - Links the module to a specific program
+   - Stores configuration (sequence, required, etc.)
+
+### File Structure
+
+```
+esp/esp/program/modules/
+├── base.py              # Base classes
+├── module_ext.py        # Module registration
+├── handlers/            # Module implementations
+│   ├── studentregcore.py
+│   ├── teacherclassregmodule.py
+│   └── ... (70+ modules)
+├── forms/               # Module-specific forms
+└── templates/           # Module-specific templates
+
+esp/templates/program/modules/
+├── studentregcore/
+│   └── student_reg.html
+├── teacherclassregmodule/
+│   └── classreg.html
+└── ...
+```
+
+## Creating a Module
+
+### Step 1: Create the Handler Class
+
+Create a file in `esp/esp/program/modules/handlers/`:
+
+```python
+# esp/esp/program/modules/handlers/mymodule.py
+
+from esp.program.modules.base import ProgramModuleObj, needs_student, \
+    main_call, aux_call
+from esp.utils.web import render_to_response
+
+class MyModule(ProgramModuleObj):
+    """Brief description of what this module does."""
+    
+    # Module metadata
+    @classmethod
+    def module_properties(cls):
+        return {
+            'admin_title': 'My Module',
+            'link_title': 'My Feature',
+            'module_type': 'learn',  # learn, teach, manage, onsite, volunteer
+            'seq': 10,  # Display order
+            'choosable': 1,  # Can be selected in admin
+        }
+    
+    # Main view (accessed at /{module_type}/{program}/{instance}/mymodule/)
+    @main_call
+    @needs_student
+    def my_main_view(self, request, tl, one, two, module, extra, prog):
+        """Main module view."""
+        context = {
+            'program': prog,
+            'user': request.user,
+        }
+        return render_to_response(
+            'program/modules/mymodule/main.html',
+            request,
+            context
+        )
+    
+    # Auxiliary view (accessed at /{module_type}/{program}/{instance}/mymodule_aux/)
+    @aux_call
+    @needs_student
+    def my_aux_view(self, request, tl, one, two, module, extra, prog):
+        """Auxiliary view for additional functionality."""
+        # Implementation
+        pass
+    
+    # Check if user has completed this module
+    def isCompleted(self):
+        """Return True if user has completed required steps."""
+        # Check if user has submitted required data
+        return MyModuleData.objects.filter(
+            user=self.user,
+            program=self.program
+        ).exists()
+
+# Register the module
+from esp.program.modules.module_ext import DBReceipt
+MyModule.register()
+```
+
+### Step 2: Create Templates
+
+Create templates in `esp/templates/program/modules/mymodule/`:
+
+```django
+{# esp/templates/program/modules/mymodule/main.html #}
+{% extends "program/base.html" %}
+
+{% block content %}
+<h1>My Module</h1>
+
+<p>Welcome, {{ user.first_name }}!</p>
+
+{# Your module UI here #}
+
+{% endblock %}
+```
+
+### Step 3: Register the Module
+
+The module is automatically registered when imported. Ensure your module file is imported in `esp/esp/program/modules/module_ext.py` or included in the handlers directory.
+
+### Step 4: Enable in Admin
+
+Navigate to `/admin/program/program/`, select your program, and add your module to the "Program modules" field.
+
+## Module Properties
+
+The `module_properties()` method returns a dictionary with:
+
+<ParamField path="admin_title" type="string" required>
+  Title shown in Django admin
+</ParamField>
+
+<ParamField path="link_title" type="string" required>
+  Title shown to users in navigation
+</ParamField>
+
+<ParamField path="module_type" type="string" required>
+  Module category: `learn`, `teach`, `manage`, `onsite`, `volunteer`, or `json`
+</ParamField>
+
+<ParamField path="seq" type="integer" default={10}>
+  Display order (modules shown in ascending order)
+</ParamField>
+
+<ParamField path="choosable" type="integer" default={0}>
+  Whether module can be selected in admin (1 = yes, 0 = no)
+</ParamField>
+
+<ParamField path="required" type="boolean" default={false}>
+  Whether module is required for all programs
+</ParamField>
+
+<ParamField path="required_label" type="string" default={''}>
+  Custom requirement text (e.g., "Required for outside teachers")
+</ParamField>
+
+## View Decorators
+
+Modules use decorators to define views and enforce permissions:
+
+### Main Call vs Aux Call
+
+<Tabs>
+  <Tab title="@main_call">
+    Defines the primary view accessed at:
+    ```
+    /{module_type}/{program}/{instance}/{handler_name}/
+    ```
+    
+    Example: `/learn/Splash/2024/studentreg/`
+  </Tab>
+  
+  <Tab title="@aux_call">
+    Defines secondary views accessed at:
+    ```
+    /{module_type}/{program}/{instance}/{view_name}/
+    ```
+    
+    The method name becomes the URL path.
+    
+    Example: Method `confirm` → `/learn/Splash/2024/confirm/`
+  </Tab>
+</Tabs>
+
+### Permission Decorators
+
+<AccordionGroup>
+  <Accordion title="@needs_student">
+    Requires user to be a student (in the Student group).
+    
+    ```python
+    @main_call
+    @needs_student
+    def student_view(self, request, tl, one, two, module, extra, prog):
+        # Only students can access
+    ```
+  </Accordion>
+  
+  <Accordion title="@needs_teacher">
+    Requires user to be a teacher.
+    
+    ```python
+    @main_call
+    @needs_teacher
+    def teacher_view(self, request, tl, one, two, module, extra, prog):
+        # Only teachers can access
+    ```
+  </Accordion>
+  
+  <Accordion title="@needs_admin">
+    Requires user to have admin permission for the program.
+    
+    ```python
+    @main_call
+    @needs_admin
+    def admin_view(self, request, tl, one, two, module, extra, prog):
+        # Only administrators can access
+    ```
+  </Accordion>
+  
+  <Accordion title="@needs_onsite">
+    Requires user to have onsite permission.
+    
+    ```python
+    @main_call
+    @needs_onsite
+    def onsite_view(self, request, tl, one, two, module, extra, prog):
+        # Only onsite staff can access
+    ```
+  </Accordion>
+  
+  <Accordion title="@meets_deadline()">
+    Requires a deadline to be open.
+    
+    ```python
+    @aux_call
+    @needs_student
+    @meets_deadline('/Registration/Start')
+    def register(self, request, tl, one, two, module, extra, prog):
+        # Only accessible after registration deadline
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## View Method Signature
+
+All module view methods receive these parameters:
+
+```python
+def view_method(self, request, tl, one, two, module, extra, prog):
+    """
+    Args:
+        request: HttpRequest object
+        tl: Module type ('learn', 'teach', etc.)
+        one: Program URL (e.g., 'Splash')
+        two: Program instance (e.g., '2024')
+        module: Module handler name
+        extra: Additional URL path components
+        prog: Program object
+    """
+    pass
+```
+
+**Common Usage**:
+```python
+def my_view(self, request, tl, one, two, module, extra, prog):
+    user = request.user
+    program = prog
+    
+    # self.user and self.program are also available
+    assert user == self.user
+    assert program == self.program
+```
+
+## Module State Methods
+
+Modules can track user completion:
+
+### isCompleted()
+
+```python
+def isCompleted(self):
+    """Return True if user has completed this module."""
+    # Example: Check if profile exists
+    from esp.program.models import RegistrationProfile
+    return RegistrationProfile.objects.filter(
+        user=self.user,
+        program=self.program
+    ).exists()
+```
+
+### students()
+
+```python
+def students(self, QObjects=False):
+    """Return students who have completed this module."""
+    # Example: Students with profiles
+    from esp.program.models import RegistrationProfile
+    profiles = RegistrationProfile.objects.filter(program=self.program)
+    
+    if QObjects:
+        # Return Q object for filtering
+        from django.db.models import Q
+        return Q(id__in=profiles.values_list('user', flat=True))
+    else:
+        # Return user queryset
+        from esp.users.models import ESPUser
+        return ESPUser.objects.filter(
+            id__in=profiles.values_list('user', flat=True)
+        )
+```
+
+### teachers()
+
+Same as `students()` but for teachers.
+
+## Configuration via Tags
+
+Modules can use the Tag system for configuration:
+
+```python
+from esp.tagdict.models import Tag
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    # Get a module-specific setting
+    max_items = Tag.getProgramTag('mymodule_max_items', prog, default='5')
+    max_items = int(max_items)
+    
+    # Get a boolean flag
+    require_confirmation = Tag.getBooleanTag(
+        'mymodule_require_confirmation',
+        prog,
+        default=False
+    )
+```
+
+Administrators can set tags at `/admin/tagdict/tag/`.
+
+## Database Models
+
+If your module needs to store data, create a model:
+
+```python
+# esp/esp/program/modules/models.py (or create a separate file)
+
+from django.db import models
+from esp.program.models import Program
+from esp.users.models import ESPUser
+
+class MyModuleData(models.Model):
+    """Data collected by MyModule."""
+    user = models.ForeignKey(ESPUser, on_delete=models.CASCADE)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE)
+    data_field = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'program')
+```
+
+Then create and run a migration:
+```bash
+python esp/manage.py makemigrations program
+python esp/manage.py migrate
+```
+
+## Forms
+
+Modules often use Django forms:
+
+```python
+# esp/esp/program/modules/forms/mymodule.py
+
+from django import forms
+
+class MyModuleForm(forms.Form):
+    field1 = forms.CharField(max_length=100)
+    field2 = forms.IntegerField()
+    field3 = forms.BooleanField(required=False)
+```
+
+Use in view:
+```python
+from esp.program.modules.forms.mymodule import MyModuleForm
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    if request.method == 'POST':
+        form = MyModuleForm(request.POST)
+        if form.is_valid():
+            # Process form data
+            pass
+    else:
+        form = MyModuleForm()
+    
+    context = {'form': form}
+    return render_to_response('...', request, context)
+```
+
+## Testing Modules
+
+Create tests in `esp/esp/program/modules/tests/`:
+
+```python
+from esp.program.modules.tests import ProgramModuleTest
+
+class MyModuleTest(ProgramModuleTest):
+    def test_main_view(self):
+        """Test that the main view loads."""
+        # Create a student user
+        student = self.create_student()
+        self.client.login(username=student.username, password='password')
+        
+        # Access the module
+        url = f'/learn/{self.program.url}/{self.program.name}/mymodule/'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'My Module')
+    
+    def test_isCompleted(self):
+        """Test completion tracking."""
+        student = self.create_student()
+        module = self.get_module_instance('MyModule', student)
+        
+        # Should not be completed initially
+        self.assertFalse(module.isCompleted())
+        
+        # Create data
+        MyModuleData.objects.create(
+            user=student,
+            program=self.program,
+            data_field='test'
+        )
+        
+        # Should now be completed
+        self.assertTrue(module.isCompleted())
+```
+
+## Common Patterns
+
+### Redirect After Success
+
+```python
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    if request.method == 'POST':
+        # Process form
+        if success:
+            # Redirect to student reg main page
+            return HttpResponseRedirect(
+                f'/learn/{one}/{two}/studentreg/'
+            )
+```
+
+### Check Deadlines
+
+```python
+from esp.program.models import Program
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    # Check if deadline is open
+    if not prog.deadline_met('/Registration/Start'):
+        return render_to_response(
+            'errors/deadline_not_met.html',
+            request,
+            {'deadline_name': 'Student Registration'}
+        )
+```
+
+### Access Control
+
+```python
+from esp.users.models import Permission
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    # Custom permission check
+    if not Permission.user_has_perm(request.user, 'V/Administer', prog):
+        return render_to_response('errors/need_auth.html', request, {})
+```
+
+### Caching Expensive Queries
+
+```python
+from argcache import cache_function
+
+@cache_function
+def get_available_classes(program_id):
+    """Get all available classes (cached)."""
+    from esp.program.models import ClassSubject
+    return ClassSubject.objects.filter(
+        parent_program_id=program_id,
+        status__gt=0
+    )
+
+def my_view(self, request, tl, one, two, module, extra, prog):
+    classes = get_available_classes(prog.id)
+```
+
+See the [Cache documentation](/dev/cache) for details.
+
+## Example: Complete Module
+
+Here's a complete example of a simple module:
+
+```python
+# esp/esp/program/modules/handlers/studentnotemodule.py
+
+from django import forms
+from esp.program.modules.base import ProgramModuleObj, needs_student, \
+    main_call
+from esp.utils.web import render_to_response
+from django.db import models
+from esp.users.models import ESPUser
+from esp.program.models import Program
+
+# Model
+class StudentNote(models.Model):
+    user = models.ForeignKey(ESPUser, on_delete=models.CASCADE)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE)
+    note = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'program')
+
+# Form
+class StudentNoteForm(forms.Form):
+    note = forms.CharField(
+        widget=forms.Textarea,
+        label="Your note",
+        help_text="Share your thoughts about the program."
+    )
+
+# Module
+class StudentNoteModule(ProgramModuleObj):
+    """Allow students to submit a note."""
+    
+    @classmethod
+    def module_properties(cls):
+        return {
+            'admin_title': 'Student Notes',
+            'link_title': 'Submit Note',
+            'module_type': 'learn',
+            'seq': 50,
+            'choosable': 1,
+        }
+    
+    @main_call
+    @needs_student
+    def note(self, request, tl, one, two, module, extra, prog):
+        # Check if note already exists
+        try:
+            existing_note = StudentNote.objects.get(
+                user=request.user,
+                program=prog
+            )
+            initial_data = {'note': existing_note.note}
+        except StudentNote.DoesNotExist:
+            initial_data = {}
+        
+        if request.method == 'POST':
+            form = StudentNoteForm(request.POST)
+            if form.is_valid():
+                # Save or update note
+                note, created = StudentNote.objects.update_or_create(
+                    user=request.user,
+                    program=prog,
+                    defaults={'note': form.cleaned_data['note']}
+                )
+                
+                context = {
+                    'program': prog,
+                    'saved': True,
+                }
+                return render_to_response(
+                    'program/modules/studentnotemodule/success.html',
+                    request,
+                    context
+                )
+        else:
+            form = StudentNoteForm(initial=initial_data)
+        
+        context = {
+            'program': prog,
+            'form': form,
+        }
+        return render_to_response(
+            'program/modules/studentnotemodule/note.html',
+            request,
+            context
+        )
+    
+    def isCompleted(self):
+        return StudentNote.objects.filter(
+            user=self.user,
+            program=self.program
+        ).exists()
+
+# Register
+StudentNoteModule.register()
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Module API Reference" icon="puzzle-piece" href="/api/modules/overview">
+    Complete module system API
+  </Card>
+  
+  <Card title="Student Modules" icon="graduation-cap" href="/api/modules/student">
+    Reference for student modules
+  </Card>
+  
+  <Card title="Teacher Modules" icon="chalkboard-user" href="/api/modules/teacher">
+    Reference for teacher modules
+  </Card>
+  
+  <Card title="Admin Modules" icon="screwdriver-wrench" href="/api/modules/admin">
+    Reference for admin modules
+  </Card>
+</CardGroup>
